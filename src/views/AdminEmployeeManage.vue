@@ -49,6 +49,7 @@
           <el-table-column prop="department" label="部門" width="120" />
           <el-table-column prop="position" label="職位" width="120" />
           <el-table-column prop="extension" label="分機" width="100" />
+          <el-table-column prop="email" label="Email" min-width="200" />
           <el-table-column label="操作" fixed="right" width="200">
             <template #default="scope">
               <el-button-group>
@@ -63,23 +64,35 @@
 
       <!-- 新增/編輯對話框 -->
       <el-dialog v-model="dialogVisible" :title="isEdit ? '編輯員工' : '新增員工'" width="50%">
-        <el-form :model="form" label-width="80px">
-          <el-form-item label="姓名">
+        <el-form
+            ref="formRef"
+            :model="form"
+            :rules="rules"
+            label-width="80px"
+        >
+          <el-form-item label="姓名" prop="name">
             <el-input v-model="form.name" />
           </el-form-item>
-          <el-form-item label="部門">
+          <el-form-item label="部門" prop="department">
             <el-select v-model="form.department" placeholder="請選擇部門" @change="generateDefaultAccount">
               <el-option label="業務部" value="業務部" />
               <el-option label="消金部" value="消金部" />
               <el-option label="借貸部" value="借貸部" />
             </el-select>
           </el-form-item>
-          <el-form-item label="職位">
+          <el-form-item label="職位" prop="position">
             <el-select v-model="form.position" placeholder="請選擇職位" @change="generateDefaultAccount">
               <el-option label="經理" value="經理" />
               <el-option label="主管" value="主管" />
               <el-option label="科員" value="科員" />
             </el-select>
+          </el-form-item>
+          <el-form-item label="Email" prop="email">
+            <el-input
+                v-model="form.email"
+                type="email"
+                placeholder="請輸入電子郵件"
+            />
           </el-form-item>
           <el-form-item label="帳號">
             <el-input v-model="form.username" disabled placeholder="系統自動生成" />
@@ -101,18 +114,36 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
-import {Plus, Edit, View, Delete, Search, Refresh} from '@element-plus/icons-vue'
+import { Plus, Edit, View, Delete, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import axios from 'axios';
+import axios from 'axios'
 
-// 所有的 ref 宣告
+// ref 宣告
 const searchQuery = ref('')
 const departmentFilter = ref('')
 const positionFilter = ref('')
 const sortOrder = ref('')
 const dialogVisible = ref(false)
 const isEdit = ref(false)
-const employeeData = ref([])  // 添加 employeeData 的宣告
+const employeeData = ref([])
+const formRef = ref(null)
+
+// 表單驗證規則
+const rules = {
+  name: [
+    { required: true, message: '請輸入姓名', trigger: 'blur' }
+  ],
+  department: [
+    { required: true, message: '請選擇部門', trigger: 'change' }
+  ],
+  position: [
+    { required: true, message: '請選擇職位', trigger: 'change' }
+  ],
+  email: [
+    { required: true, message: '請輸入電子郵件', trigger: 'blur' },
+    { type: 'email', message: '請輸入有效的電子郵件地址', trigger: 'blur' }
+  ]
+}
 
 const form = reactive({
   name: '',
@@ -120,76 +151,72 @@ const form = reactive({
   position: '',
   extension: '',
   username: '',
-  password: ''
+  password: '',
+  email: ''
 })
 
-// 添加獲取用戶列表的方法
-const fetchEmployees = async () => {
-  try {
-    const response = await axios.get('/api/user/employees');
-    employeeData.value = response.data.map(user => ({
-      id: user.account,
-      name: user.name,
-      department: user.department,
-      position: user.position,
-      extension: user.extension,
-      username: user.account
-    }));
-  } catch (error) {
-    console.error('獲取用戶列表失敗:', error);
-    ElMessage.error('獲取用戶列表失敗');
-  }
-};
-
-// 在組件載入時獲取數據
-onMounted(() => {
-  fetchEmployees();
-});
-
+// 部門職位對應表
 const prefixMap = {
   '業務部': { '經理': 'BDM', '主管': 'BDS', '科員': 'BDC' },
   '消金部': { '經理': 'FDM', '主管': 'FDS', '科員': 'FDC' },
   '借貸部': { '經理': 'LDM', '主管': 'LDS', '科員': 'LDC' }
 }
 
-const filteredEmployeeData = computed(() => {
-  let result = [...employeeData.value];
+// 獲取員工列表
+const fetchEmployees = async () => {
+  try {
+    const response = await axios.get('/api/user/employees')
+    employeeData.value = response.data.map(user => ({
+      id: user.account,
+      name: user.name,
+      department: user.department,
+      position: user.position,
+      extension: user.extension,
+      username: user.account,
+      email: user.email  // 添加 email 映射
+    }))
+  } catch (error) {
+    console.error('獲取用戶列表失敗:', error)
+    ElMessage.error('獲取用戶列表失敗')
+  }
+}
 
-  // 姓名搜尋
+// 篩選後的員工數據
+const filteredEmployeeData = computed(() => {
+  let result = [...employeeData.value]
+
   if (searchQuery.value) {
     result = result.filter(employee =>
         employee.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    );
+    )
   }
 
-  // 部門篩選
   if (departmentFilter.value) {
     result = result.filter(employee =>
         employee.department === departmentFilter.value
-    );
+    )
   }
 
-  // 職位篩選
   if (positionFilter.value) {
     result = result.filter(employee =>
         employee.position === positionFilter.value
-    );
+    )
   }
 
-  // 排序
   if (sortOrder.value) {
     result.sort((a, b) => {
       if (sortOrder.value === 'asc') {
-        return a.id.localeCompare(b.id);
+        return a.id.localeCompare(b.id)
       } else {
-        return b.id.localeCompare(a.id);
+        return b.id.localeCompare(a.id)
       }
-    });
+    })
   }
 
-  return result;
-});
+  return result
+})
 
+// 開啟新增對話框
 const openAddEmployeeDialog = () => {
   dialogVisible.value = true
   isEdit.value = false
@@ -197,15 +224,21 @@ const openAddEmployeeDialog = () => {
   generateDefaultAccount()
 }
 
+// 重置表單
 const resetForm = () => {
+  if (formRef.value) {
+    formRef.value.resetFields()
+  }
   form.name = ''
   form.department = ''
   form.position = ''
   form.extension = ''
   form.username = ''
   form.password = ''
+  form.email = ''
 }
 
+// 生成隨機密碼
 const generateRandomPassword = () => {
   const characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
   let password = ''
@@ -216,6 +249,7 @@ const generateRandomPassword = () => {
   return password
 }
 
+// 生成預設帳號
 const generateDefaultAccount = () => {
   if (!form.department || !form.position) {
     form.username = ''
@@ -224,7 +258,6 @@ const generateDefaultAccount = () => {
   }
 
   const prefix = prefixMap[form.department]?.[form.position]
-
   if (!prefix) {
     form.username = ''
     form.password = ''
@@ -239,16 +272,22 @@ const generateDefaultAccount = () => {
   form.password = generateRandomPassword()
 }
 
+// 查看處理
 const handleView = () => {
   ElMessage.info('查看功能開發中')
 }
 
+// 編輯處理
 const handleEdit = (row) => {
   isEdit.value = true
   dialogVisible.value = true
-  Object.assign(form, row)
+  Object.assign(form, {
+    ...row,
+    email: row.email || ''  // 確保 email 欄位被正確賦值
+  })
 }
 
+// 刪除處理
 const handleDelete = async (row) => {
   try {
     await ElMessageBox.confirm(
@@ -259,57 +298,67 @@ const handleDelete = async (row) => {
           cancelButtonText: '取消',
           type: 'warning',
         }
-    );
+    )
 
     await axios.delete('/api/user/employee', {
       data: {
-        account: row.username  // 改為使用 row.username
+        account: row.username
       }
-    });
+    })
 
-    ElMessage.success('刪除成功');
-    await fetchEmployees();
+    ElMessage.success('刪除成功')
+    await fetchEmployees()
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('刪除失敗:', error);
-      ElMessage.error('刪除失敗，請重試');
+      console.error('刪除失敗:', error)
+      ElMessage.error('刪除失敗，請重試')
     }
   }
-};
+}
 
+// 提交處理
 const handleSubmit = async () => {
-  if (!form.name || !form.department || !form.position || !form.username || !form.password) {
-    ElMessage.error('請填寫所有必填欄位');
-    return;
-  }
+  if (!formRef.value) return
 
   try {
+    await formRef.value.validate()
+
     const response = await axios.post('/api/user/register', {
       name: form.name,
       department: form.department,
       position: form.position,
       account: form.username,
-      password: form.password
-    });
+      password: form.password,
+      email: form.email
+    })
 
     if (response.status === 201) {
-      ElMessage.success('新增成功，預設帳號和密碼已生成');
-      await fetchEmployees();  // 重新獲取用戶列表
-      dialogVisible.value = false;
-      resetForm();
+      ElMessage.success('新增成功，帳號密碼已發送至使用者信箱')
+      await fetchEmployees()
+      dialogVisible.value = false
+      resetForm()
     }
   } catch (error) {
-    ElMessage.error('新增失敗，請重試');
-    console.error('新增失敗:', error);
+    if (error?.message?.includes('validation')) {
+      return // 表單驗證失敗，不繼續執行
+    }
+    console.error('新增失敗:', error)
+    ElMessage.error('新增失敗，請重試')
   }
-};
+}
 
+// 重置篩選
 const resetFilters = () => {
   searchQuery.value = ''
   departmentFilter.value = ''
   positionFilter.value = ''
   sortOrder.value = ''
 }
+
+// 組件載入時獲取數據
+onMounted(() => {
+  fetchEmployees()
+})
 </script>
 
 

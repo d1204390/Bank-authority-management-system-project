@@ -13,11 +13,11 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// 原有的帳號鎖定郵件發送功能
 const sendLockAccountEmail = async (to, remainingTime, ipAddress) => {
     try {
-        // 添加郵件發送時間檢查
         const emailContent = {
-            from: `"系統管理員" <${process.env.EMAIL_USER}>`,  // 更友善的寄件者名稱
+            from: `"系統管理員" <${process.env.EMAIL_USER}>`,
             to: to,
             subject: '【系統通知】帳號安全提醒',
             html: `
@@ -38,7 +38,39 @@ const sendLockAccountEmail = async (to, remainingTime, ipAddress) => {
         return true;
     } catch (error) {
         console.error('郵件發送失敗:', error);
-        return false;  // 返回失敗狀態
+        return false;
+    }
+};
+
+// 新增發送帳號密碼的函數
+const sendAccountCredentials = async (to, name, account, password) => {
+    try {
+        const emailContent = {
+            from: `"系統管理員" <${process.env.EMAIL_USER}>`,
+            to: to,
+            subject: '【系統通知】帳號建立成功通知',
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2 style="color: #409EFF;">帳號建立成功通知</h2>
+                    <p>親愛的 ${name}，您好：</p>
+                    <p>您的帳號已經建立成功，以下是您的登入資訊：</p>
+                    <div style="background-color: #f5f7fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <p style="margin: 5px 0;"><strong>帳號：</strong>${account}</p>
+                        <p style="margin: 5px 0;"><strong>密碼：</strong>${password}</p>
+                    </div>
+                    <p style="color: #E6A23C;">為了確保帳號安全，請在首次登入後立即修改密碼。</p>
+                    <hr>
+                    <p style="color: #909399; font-size: 12px;">此為系統自動發送的郵件，請勿直接回覆。</p>
+                </div>
+            `
+        };
+
+        const info = await transporter.sendMail(emailContent);
+        console.log('帳號建立通知郵件已發送', info.messageId);
+        return true;
+    } catch (error) {
+        console.error('郵件發送失敗:', error);
+        return false;
     }
 };
 
@@ -52,5 +84,6 @@ transporter.verify(function(error, success) {
 });
 
 module.exports = {
-    sendLockAccountEmail
+    sendLockAccountEmail,
+    sendAccountCredentials  // 記得導出新函數
 };
