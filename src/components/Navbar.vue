@@ -3,7 +3,7 @@
     <div class="nav-container">
       <div class="nav-brand">
         <router-link to="/" class="brand-link">
-          <span class="brand-text">SYSTEX INTRANET</span>
+          <span class="brand-text">TRUST ME BANK INTRANET</span>
         </router-link>
       </div>
 

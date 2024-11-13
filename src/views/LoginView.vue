@@ -14,7 +14,7 @@
               type="text"
               v-model="username"
               class="form-input"
-          >
+          />
         </div>
         <div class="form-group">
           <label>密碼:</label>
@@ -23,7 +23,8 @@
                 :type="showPassword ? 'text' : 'password'"
                 v-model="password"
                 class="form-input"
-            >
+                @keydown.enter="handleLogin"
+            />
             <span class="password-toggle" @click="showPassword = !showPassword">
               <i :class="['fas', showPassword ? 'fa-eye-slash' : 'fa-eye']"></i>
             </span>
@@ -34,6 +35,7 @@
     </div>
   </div>
 </template>
+
 
 <script>
 import axios from 'axios'; // 確保你有引入 axios
@@ -102,15 +104,14 @@ export default {
 
     async handleLogin() {
       try {
-        // 發送帳號、密碼和模式到後端 API
-        const response = await axios.post('http://localhost:5000/api/admin/login', {
-          account: this.username,
-          password: this.password,
-          isAdminMode: this.isAdminMode  // 添加模式標記
-        });
-
-        // 如果當前處於管理員模式
         if (this.isAdminMode) {
+          // 管理員登入
+          const response = await axios.post('http://localhost:5000/api/admin/login', {
+            account: this.username,
+            password: this.password,
+            isAdminMode: this.isAdminMode
+          });
+
           if (response.data.msg === '登入成功') {
             localStorage.setItem('token', response.data.token);
             ElMessage.success('管理員登入成功');
@@ -120,13 +121,24 @@ export default {
             ElMessage.error('登入失敗');
           }
         } else {
-          // 非管理員模式，限制管理員帳號登入
-          if (this.username !== 'admin') {
-            ElMessage.success('使用者登入成功');
-            console.log('使用者登入成功');
-            this.$router.push('/user');
-          } else {
-            ElMessage.warning('登入失敗，請稍後再試');
+          // 使用者登入
+          try {
+            const response = await axios.post('http://localhost:5000/api/user/login', {
+              account: this.username,
+              password: this.password
+            });
+
+            if (response.data.msg === '登入成功') {
+              localStorage.setItem('token', response.data.token);
+              ElMessage.success('使用者登入成功');
+              this.$router.push('/user');
+            }
+          } catch (error) {
+            if (error.response) {
+              ElMessage.error(error.response.data.msg || '登入失敗');
+            } else {
+              ElMessage.error('網路錯誤，請檢查連線');
+            }
           }
         }
       } catch (error) {
@@ -150,7 +162,6 @@ export default {
                 ElMessage.error('登入失敗，請稍後再試');
             }
           } else {
-            // 非管理員模式下的錯誤處理
             ElMessage.error('登入失敗，請稍後再試');
           }
         } else {

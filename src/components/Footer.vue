@@ -4,7 +4,7 @@
       <div class="footer-content">
         <div class="footer-section">
           <h3>系統資訊</h3>
-          <p>版本：V1.0.0 | 最後更新：2024/03/23</p>
+          <p>版本：V1.0.0 | 最後更新：2024/11/25</p>
         </div>
         <div class="footer-section">
           <h3>技術支援</h3>

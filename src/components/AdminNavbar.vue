@@ -3,7 +3,7 @@
     <div class="nav-container">
       <div class="nav-brand">
         <router-link to="/admin" class="brand-link">
-          <span class="brand-text">SYSTEX INTRANET 歡迎系統管理員</span>
+          <span class="brand-text">Trust Me Bank INTRANET 歡迎系統管理員</span>
         </router-link>
       </div>
 

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { ElMessage } from 'element-plus'; // 引入 Element Plus 消息提示
 import LoginView from '../views/LoginView.vue';
 import AdminDashboard from '../views/AdminDashboard.vue';
+import AdminEmployeeManage from '../views/AdminEmployeeManage.vue';
 
 const routes = [
     {
@@ -14,7 +15,13 @@ const routes = [
         name: 'Admin',
         component: AdminDashboard,
         meta: { requiresAuth: true }
-    }
+    },
+    {
+        path: '/admin/EmployeesManagementPage',
+        name: 'EmployeesManagement',
+        component: AdminEmployeeManage,
+        meta: { requiresAuth: true }  // 添加認證要求
+    },
 ];
 
 // Token 過期檢查函數

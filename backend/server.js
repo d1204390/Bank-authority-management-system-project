@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
@@ -20,6 +21,10 @@ app.get('/', (req, res) => {
 // Admin routes
 const adminRoutes = require('./routes/adminRoutes');
 app.use('/api/admin', adminRoutes);
+
+// User routes
+const userRoutes = require('./routes/user');
+app.use('/api/user', userRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

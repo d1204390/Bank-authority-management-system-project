@@ -21,24 +21,22 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'AdminDashboard',
-  methods: {
-    handleUserManagement() {
-      console.log('Navigating to User Management');
-      // 在這裡可以導向用戶管理頁面
-    },
-    handleSystemSettings() {
-      console.log('Navigating to System Settings');
-      // 在這裡可以導向系統設置頁面
-    },
-    handleLogView() {
-      console.log('Navigating to Log View');
-      // 在這裡可以導向日誌查看頁面
-    }
-  }
-}
+<script setup>
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+const handleUserManagement = () => {
+  router.push('/admin/EmployeesManagementPage');
+};
+
+const handleSystemSettings = () => {
+  router.push('/admin/settings');  // 如果需要添加這個路由
+};
+
+const handleLogView = () => {
+  router.push('/admin/logs');  // 如果需要添加這個路由
+};
 </script>
 
 <style scoped>

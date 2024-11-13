@@ -2,9 +2,12 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router/index.js';
-import axios from 'axios';  // 這是之前的 axios 添加
-import ElementPlus from 'element-plus';  // 引入 element-plus
-import 'element-plus/dist/index.css';  // 引入 element-plus 的樣式
+import axios from 'axios';
+import ElementPlus from 'element-plus';
+import 'element-plus/dist/index.css';
+
+// 設置 Axios 的基礎 URL
+axios.defaults.baseURL = 'http://localhost:5000';  // 根據您的後端伺服器的地址和端口進行調整
 
 // 添加請求攔截器
 axios.interceptors.request.use(config => {
@@ -20,5 +23,5 @@ axios.interceptors.request.use(config => {
 const app = createApp(App);
 
 app.use(router);
-app.use(ElementPlus);  // 使用 element-plus
+app.use(ElementPlus);
 app.mount('#app');
