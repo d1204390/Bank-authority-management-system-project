@@ -104,9 +104,32 @@
         <template #footer>
           <span class="dialog-footer">
             <el-button @click="dialogVisible = false">取消</el-button>
-            <el-button type="primary" @click="handleSubmit">確定</el-button>
+            <el-button type="primary" @click="handleSubmit" :loading="isSubmitting">
+              {{ isSubmitting ? '處理中...' : '確定' }}
+            </el-button>
           </span>
         </template>
+      </el-dialog>
+
+      <!-- 進度對話框 -->
+      <el-dialog
+          v-model="progressVisible"
+          title="處理進度"
+          :close-on-click-modal="false"
+          :show-close="false"
+          width="30%"
+      >
+        <div class="progress-container">
+          <el-steps :active="activeStep" finish-status="success">
+            <el-step title="保存資料" />
+            <el-step title="生成帳號" />
+            <el-step title="發送郵件" />
+          </el-steps>
+
+          <div class="progress-message">
+            {{ progressMessage }}
+          </div>
+        </div>
       </el-dialog>
     </div>
   </div>
@@ -127,6 +150,12 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const employeeData = ref([])
 const formRef = ref(null)
+const isSubmitting = ref(false)
+
+// 進度相關的 ref
+const progressVisible = ref(false)
+const activeStep = ref(0)
+const progressMessage = ref('')
 
 // 表單驗證規則
 const rules = {
@@ -162,7 +191,7 @@ const prefixMap = {
   '借貸部': { '經理': 'LDM', '主管': 'LDS', '科員': 'LDC' }
 }
 
-// 獲取員工列表
+// 獲取員工列表方法
 const fetchEmployees = async () => {
   try {
     const response = await axios.get('/api/user/employees')
@@ -173,7 +202,7 @@ const fetchEmployees = async () => {
       position: user.position,
       extension: user.extension,
       username: user.account,
-      email: user.email  // 添加 email 映射
+      email: user.email
     }))
   } catch (error) {
     console.error('獲取用戶列表失敗:', error)
@@ -238,6 +267,14 @@ const resetForm = () => {
   form.email = ''
 }
 
+// 重置進度
+const resetProgress = () => {
+  activeStep.value = 0
+  progressMessage.value = ''
+  progressVisible.value = false
+  isSubmitting.value = false
+}
+
 // 生成隨機密碼
 const generateRandomPassword = () => {
   const characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
@@ -283,7 +320,7 @@ const handleEdit = (row) => {
   dialogVisible.value = true
   Object.assign(form, {
     ...row,
-    email: row.email || ''  // 確保 email 欄位被正確賦值
+    email: row.email || ''
   })
 }
 
@@ -322,7 +359,14 @@ const handleSubmit = async () => {
 
   try {
     await formRef.value.validate()
+    isSubmitting.value = true
 
+    // 顯示進度對話框
+    progressVisible.value = true
+    progressMessage.value = '正在保存用戶資料...'
+    activeStep.value = 1
+
+    // 發送註冊請求
     const response = await axios.post('/api/user/register', {
       name: form.name,
       department: form.department,
@@ -332,15 +376,30 @@ const handleSubmit = async () => {
       email: form.email
     })
 
+    // 更新進度
+    progressMessage.value = '正在生成帳號...'
+    activeStep.value = 2
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    progressMessage.value = '正在發送郵件通知...'
+    activeStep.value = 3
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
     if (response.status === 201) {
-      ElMessage.success('新增成功，帳號密碼已發送至使用者信箱')
+      progressMessage.value = '處理完成！'
       await fetchEmployees()
-      dialogVisible.value = false
-      resetForm()
+
+      setTimeout(() => {
+        resetProgress()
+        dialogVisible.value = false
+        resetForm()
+        ElMessage.success('新增成功，帳號密碼已發送至使用者信箱')
+      }, 1000)
     }
   } catch (error) {
+    resetProgress()
     if (error?.message?.includes('validation')) {
-      return // 表單驗證失敗，不繼續執行
+      return
     }
     console.error('新增失敗:', error)
     ElMessage.error('新增失敗，請重試')
@@ -360,8 +419,6 @@ onMounted(() => {
   fetchEmployees()
 })
 </script>
-
-
 <style scoped>
 .employee-manage {
   min-height: 100vh;
@@ -411,6 +468,19 @@ onMounted(() => {
   overflow-x: auto; /* 讓表格在小螢幕上水平滾動 */
 }
 
+/* 進度對話框相關樣式 */
+.progress-container {
+  padding: 20px;
+}
+
+.progress-message {
+  text-align: center;
+  margin-top: 20px;
+  color: #409EFF;
+  font-size: 14px;
+  min-height: 30px;
+}
+
 /* Element Plus 組件樣式調整 */
 :deep(.el-table) {
   border-radius: 8px;
@@ -429,6 +499,14 @@ onMounted(() => {
 :deep(.el-button-group) {
   display: flex;
   gap: 8px;
+}
+
+:deep(.el-steps) {
+  margin-bottom: 20px;
+}
+
+:deep(.el-step__title) {
+  font-size: 14px;
 }
 
 /* 響應式設計 */
@@ -483,11 +561,12 @@ onMounted(() => {
     width: 100%;
   }
 
-  @media (max-width: 480px) {
-    /* 使用深度選取器來正確地影響 el-table-column 的樣式 */
-    :deep(.el-table-column) {
-      font-size: 14px;
-    }
+  :deep(.el-table-column) {
+    font-size: 14px;
+  }
+
+  .progress-container {
+    padding: 10px;
   }
 }
 </style>

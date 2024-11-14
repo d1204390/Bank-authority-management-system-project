@@ -1,10 +1,10 @@
-// user.js
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const User = require('../models/User');
-const mongoose = require('mongoose');  // 添加 mongoose 導入
+const mongoose = require('mongoose');
+const { sendAccountCredentials } = require('../utils/emailService');
 
 // 驗證請求必填欄位
 const validateFields = (fields, res) => {
@@ -18,7 +18,7 @@ const validateFields = (fields, res) => {
 
 // 使用者註冊
 router.post('/register', async (req, res) => {
-    const { name, department, position, account, password } = req.body;
+    const { name, department, position, account, password, email } = req.body;
 
     // 驗證必填欄位
     if (!validateFields([
@@ -26,13 +26,20 @@ router.post('/register', async (req, res) => {
         { name: 'department', value: department },
         { name: 'position', value: position },
         { name: 'account', value: account },
-        { name: 'password', value: password }
+        { name: 'password', value: password },
+        { name: 'email', value: email }
     ], res)) return;
 
     try {
         // 檢查帳號是否已存在
         if (await User.exists({ account })) {
             return res.status(400).json({ msg: '帳號已存在' });
+        }
+
+        // 檢查 email 格式
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ msg: '無效的電子郵件格式' });
         }
 
         // 哈希密碼並創建新使用者
@@ -43,9 +50,16 @@ router.post('/register', async (req, res) => {
             position,
             account,
             password: hashedPassword,
+            email
         });
 
-        res.status(201).json({ msg: '使用者創建成功', user: newUser });
+        // 發送帳號密碼到使用者信箱
+        const emailSent = await sendAccountCredentials(email, name, account, password);
+
+        res.status(201).json({
+            msg: emailSent ? '使用者創建成功，帳號密碼已發送至信箱' : '使用者創建成功，但郵件發送失敗',
+            user: newUser
+        });
     } catch (error) {
         console.error('伺服器錯誤:', error.message);
         res.status(500).json({ msg: '伺服器錯誤', error: error.message });
@@ -74,9 +88,15 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ msg: '密碼錯誤' });
         }
 
-        // 創建 JWT
+        // 創建 JWT，也可以把部門和職位加入 token 中
         const token = jwt.sign(
-            { id: user._id, account: user.account, role: user.role },
+            {
+                id: user._id,
+                account: user.account,
+                role: user.role,
+                department: user.department,  // 加入部門
+                position: user.position      // 加入職位
+            },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
@@ -88,7 +108,9 @@ router.post('/login', async (req, res) => {
                 id: user._id,
                 name: user.name,
                 account: user.account,
-                role: user.role
+                role: user.role,
+                department: user.department,  // 加入部門
+                position: user.position      // 加入職位
             }
         });
     } catch (error) {
