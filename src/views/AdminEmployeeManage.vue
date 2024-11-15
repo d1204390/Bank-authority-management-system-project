@@ -157,6 +157,20 @@ const progressVisible = ref(false)
 const activeStep = ref(0)
 const progressMessage = ref('')
 
+// 部門代碼映射
+const departmentMap = {
+  'BD': '業務部',
+  'FD': '消金部',
+  'LD': '借貸部'
+}
+
+// 職位代碼映射
+const positionMap = {
+  'M': '經理',
+  'S': '主管',
+  'C': '科員'
+}
+
 // 表單驗證規則
 const rules = {
   name: [
@@ -191,6 +205,16 @@ const prefixMap = {
   '借貸部': { '經理': 'LDM', '主管': 'LDS', '科員': 'LDC' }
 }
 
+// 轉換部門代碼為中文
+const convertDepartment = (code) => {
+  return departmentMap[code] || code
+}
+
+// 轉換職位代碼為中文
+const convertPosition = (code) => {
+  return positionMap[code] || code
+}
+
 // 獲取員工列表方法
 const fetchEmployees = async () => {
   try {
@@ -198,11 +222,13 @@ const fetchEmployees = async () => {
     employeeData.value = response.data.map(user => ({
       id: user.account,
       name: user.name,
-      department: user.department,
-      position: user.position,
+      department: convertDepartment(user.department),
+      position: convertPosition(user.position),
       extension: user.extension,
       username: user.account,
-      email: user.email
+      email: user.email,
+      raw_department: user.department,
+      raw_position: user.position
     }))
   } catch (error) {
     console.error('獲取用戶列表失敗:', error)
@@ -320,6 +346,8 @@ const handleEdit = (row) => {
   dialogVisible.value = true
   Object.assign(form, {
     ...row,
+    department: row.raw_department || row.department,
+    position: row.raw_position || row.position,
     email: row.email || ''
   })
 }
@@ -419,6 +447,7 @@ onMounted(() => {
   fetchEmployees()
 })
 </script>
+
 <style scoped>
 .employee-manage {
   min-height: 100vh;

@@ -66,19 +66,14 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// 使用者登入
+// user.js 路由中的登入處理
+// user.js 中的登入處理
 router.post('/login', async (req, res) => {
     const { account, password } = req.body;
 
-    // 驗證必填欄位
-    if (!validateFields([
-        { name: 'account', value: account },
-        { name: 'password', value: password }
-    ], res)) return;
-
     try {
-        // 查找使用者並驗證帳號和密碼
         const user = await User.findOne({ account });
+
         if (!user) {
             return res.status(400).json({ msg: '帳號不存在' });
         }
@@ -88,19 +83,83 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ msg: '密碼錯誤' });
         }
 
-        // 創建 JWT，也可以把部門和職位加入 token 中
+        // 部門代碼映射
+        const departmentMap = {
+            '業務部': 'BD',
+            '消金部': 'FD',
+            '借貸部': 'LD',
+            'BD': 'BD',
+            'FD': 'FD',
+            'LD': 'LD'
+        };
+
+        // 職位代碼映射
+        const positionMap = {
+            '經理': 'M',
+            '主管': 'S',
+            '科員': 'C',
+            'M': 'M',
+            'S': 'S',
+            'C': 'C'
+        };
+
+        // 確保部門和職位代碼正確
+        const department = departmentMap[user.department] || user.department;
+        const position = positionMap[user.position] || user.position;
+
+        // 準備 token payload
+        const tokenPayload = {
+            id: user._id.toString(),
+            account: user.account,
+            name: user.name,
+            department: department,    // 使用轉換後的代碼
+            position: position,        // 使用轉換後的代碼
+            role: 'user',
+            exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1小時過期
+        };
+
+        // 驗證所有必要字段
+        const requiredFields = ['id', 'account', 'name', 'department', 'position', 'role'];
+        const missingFields = requiredFields.filter(field => !tokenPayload[field]);
+
+        if (missingFields.length > 0) {
+            console.error('Missing required fields:', missingFields);
+            return res.status(500).json({ msg: '用戶數據不完整' });
+        }
+
+        // 檢查部門和職位格式
+        if (!['BD', 'FD', 'LD'].includes(department)) {
+            console.error('Invalid department code:', department);
+            return res.status(500).json({ msg: '部門格式錯誤' });
+        }
+
+        if (!['M', 'S', 'C'].includes(position)) {
+            console.error('Invalid position code:', position);
+            return res.status(500).json({ msg: '職位格式錯誤' });
+        }
+
+        // 創建 token
         const token = jwt.sign(
-            {
-                id: user._id,
-                account: user.account,
-                role: user.role,
-                department: user.department,  // 加入部門
-                position: user.position      // 加入職位
-            },
+            tokenPayload,
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { algorithm: 'HS256' }
         );
 
+        // 驗證生成的 token
+        try {
+            const verified = jwt.verify(token, process.env.JWT_SECRET);
+            console.log('Token verification successful:', {
+                account: verified.account,
+                department: verified.department,
+                position: verified.position,
+                exp: new Date(verified.exp * 1000)
+            });
+        } catch (verifyError) {
+            console.error('Token verification failed:', verifyError);
+            return res.status(500).json({ msg: '令牌生成錯誤' });
+        }
+
+        // 回傳結果
         res.json({
             msg: '登入成功',
             token,
@@ -108,13 +167,14 @@ router.post('/login', async (req, res) => {
                 id: user._id,
                 name: user.name,
                 account: user.account,
-                role: user.role,
-                department: user.department,  // 加入部門
-                position: user.position      // 加入職位
+                department: department,    // 使用轉換後的代碼
+                position: position,        // 使用轉換後的代碼
+                role: 'user'
             }
         });
+
     } catch (error) {
-        console.error('伺服器錯誤:', error.message);
+        console.error('Login error:', error);
         res.status(500).json({ msg: '伺服器錯誤', error: error.message });
     }
 });

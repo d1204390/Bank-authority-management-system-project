@@ -11,7 +11,7 @@ const LOCK_TIME = 15 * 60 * 1000;
 router.post('/login', async (req, res) => {
     const { account, password, isAdminMode } = req.body;
 
-// 改進的 IP 獲取與處理
+    // 改進的 IP 獲取與處理
     const ipAddress =
         req.headers['x-forwarded-for'] ||
         req.connection.remoteAddress ||
@@ -19,7 +19,7 @@ router.post('/login', async (req, res) => {
         req.ip ||
         '0.0.0.0';
 
-// IPv6 to IPv4 轉換，並處理本地回環地址
+    // IPv6 to IPv4 轉換，並處理本地回環地址
     const formattedIP = ipAddress === '::1'
         ? '127.0.0.1'  // 如果是本地回環地址，轉換為 IPv4 格式
         : ipAddress.includes('::ffff:')
@@ -126,7 +126,14 @@ router.post('/login', async (req, res) => {
 
         // 創建 JWT
         const token = jwt.sign(
-            { id: admin._id, account: admin.account },
+            {
+                id: admin._id,
+                account: admin.account,
+                name: admin.name,
+                role: admin.role,          // 添加角色
+                department: 'ADMIN',       // 管理員部門標識
+                position: 'ADMIN'          // 管理員職位標識
+            },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
@@ -137,7 +144,8 @@ router.post('/login', async (req, res) => {
             admin: {
                 id: admin._id,
                 name: admin.name,
-                account: admin.account
+                account: admin.account,
+                role: admin.role
             }
         });
 

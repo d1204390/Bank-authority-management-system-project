@@ -30,150 +30,225 @@
             </span>
           </div>
         </div>
-        <button class="login-btn" @click="handleLogin">Login</button>
+        <button
+            class="login-btn"
+            @click="handleLogin"
+            :disabled="isLoading"
+        >
+          {{ isLoading ? '登入中...' : 'Login' }}
+        </button>
       </div>
     </div>
   </div>
 </template>
 
-
-<script>
-import axios from 'axios'; // 確保你有引入 axios
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { getTokenInfo } from '@/router/guards'
 
-export default {
-  name: 'LoginView',
-  data() {
-    return {
-      username: '',
-      password: '',
-      showPassword: false,
-      clickCount: 0,
-      isAdminMode: false,
-      clickTimer: null
-    }
-  },
+const router = useRouter()
 
-  created() {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        // 解析 token 中的資訊
-        const tokenData = JSON.parse(atob(token.split('.')[1]));
-        if (tokenData.account === 'admin') {
-          this.$router.push('/admin');
-        } else if (tokenData.account === 'user') {  // 先假設一般使用者的帳號類型是 'user'，因為還沒做
-          this.$router.push('/user');
-        }
-      } catch (error) {
-        localStorage.removeItem('token');
-        ElMessage.error('登入已過期，請重新登入');
+// 響應式狀態
+const username = ref('')
+const password = ref('')
+const showPassword = ref(false)
+const clickCount = ref(0)
+const isAdminMode = ref(false)
+const clickTimer = ref(null)
+const isLoading = ref(false)
+
+// 路由處理函數
+const handleRouting = async (tokenData) => {
+  try {
+    // 確定要跳轉的路徑
+    let targetPath = '/user/profile' // 預設路徑
+
+    if (tokenData.role === 'admin') {
+      targetPath = '/admin'
+    } else {
+      switch(tokenData.department) {
+        case 'BD':
+          targetPath = '/business/dashboard'
+          break
+        case 'FD':
+          targetPath = '/finance/dashboard'
+          break
+        case 'LD':
+          targetPath = '/loan/dashboard'
+          break
       }
     }
-  },
 
-  methods: {
-    handleTitleClick() {
-      this.clickCount++;
+    // 使用 replace 而不是 push，避免瀏覽器歷史堆棧問題
+    await router.replace(targetPath)
 
-      // 清除現有的計時器
-      if (this.clickTimer) {
-        clearTimeout(this.clickTimer);
-      }
-
-      // 設置新的計時器（2秒後重置）
-      this.clickTimer = setTimeout(() => {
-        this.clickCount = 0;
-      }, 2000);
-
-      // 當當前是管理員模式，且點擊達到3次時切換回使用者模式
-      if (this.isAdminMode && this.clickCount >= 3) {
-        this.isAdminMode = false;
-        this.clickCount = 0;
-        clearTimeout(this.clickTimer);
-        return;
-      }
-
-      // 當點擊達到5次時切換到管理員模式
-      if (!this.isAdminMode && this.clickCount >= 5) {
-        this.isAdminMode = true;  // 切換到管理員模式
-        this.clickCount = 0;
-        clearTimeout(this.clickTimer);
-      }
-    },
-
-    async handleLogin() {
-      try {
-        if (this.isAdminMode) {
-          // 管理員登入
-          const response = await axios.post('http://localhost:5000/api/admin/login', {
-            account: this.username,
-            password: this.password,
-            isAdminMode: this.isAdminMode
-          });
-
-          if (response.data.msg === '登入成功') {
-            localStorage.setItem('token', response.data.token);
-            ElMessage.success('管理員登入成功');
-            console.log('管理員登入成功');
-            this.$router.push('/admin');
-          } else {
-            ElMessage.error('登入失敗');
-          }
-        } else {
-          // 使用者登入
-          try {
-            const response = await axios.post('http://localhost:5000/api/user/login', {
-              account: this.username,
-              password: this.password
-            });
-
-            if (response.data.msg === '登入成功') {
-              localStorage.setItem('token', response.data.token);
-              ElMessage.success('使用者登入成功');
-              this.$router.push('/user');
-            }
-          } catch (error) {
-            if (error.response) {
-              ElMessage.error(error.response.data.msg || '登入失敗');
-            } else {
-              ElMessage.error('網路錯誤，請檢查連線');
-            }
-          }
-        }
-      } catch (error) {
-        if (error.response) {
-          const { status, data } = error.response;
-
-          // 只在管理員模式下顯示詳細錯誤訊息
-          if (this.isAdminMode) {
-            switch (status) {
-              case 403:
-                ElMessage.error(data.msg);
-                break;
-              case 400:
-                if (data.attemptsLeft) {
-                  ElMessage.error(`密碼錯誤，還剩 ${data.attemptsLeft} 次嘗試機會`);
-                } else {
-                  ElMessage.error(data.msg);
-                }
-                break;
-              default:
-                ElMessage.error('登入失敗，請稍後再試');
-            }
-          } else {
-            ElMessage.error('登入失敗，請稍後再試');
-          }
-        } else {
-          ElMessage.error('網路錯誤，請檢查連線');
-        }
-        console.error('登入錯誤:', error);
-      }
-    }
+  } catch (error) {
+    console.error('Navigation error:', error)
+    ElMessage.error('導航錯誤，請重試')
   }
 }
-</script>
 
+// 標題點擊處理
+const handleTitleClick = () => {
+  clickCount.value++
+
+  if (clickTimer.value) {
+    clearTimeout(clickTimer.value)
+  }
+
+  clickTimer.value = setTimeout(() => {
+    clickCount.value = 0
+  }, 2000)
+
+  if (isAdminMode.value && clickCount.value >= 3) {
+    isAdminMode.value = false
+    clickCount.value = 0
+    clearTimeout(clickTimer.value)
+    return
+  }
+
+  if (!isAdminMode.value && clickCount.value >= 5) {
+    isAdminMode.value = true
+    clickCount.value = 0
+    clearTimeout(clickTimer.value)
+  }
+}
+
+// 檢查登入狀態並重定向
+const checkLoginStatus = async () => {
+  const token = localStorage.getItem('token')
+  if (!token) return false
+
+  try {
+    const tokenInfo = getTokenInfo(token)
+    if (!tokenInfo) {
+      localStorage.removeItem('token')
+      sessionStorage.removeItem('userInfo')
+      return false
+    }
+
+    await handleRouting(tokenInfo)
+    return true
+  } catch (error) {
+    console.error('Token check error:', error)
+    localStorage.removeItem('token')
+    sessionStorage.removeItem('userInfo')
+    return false
+  }
+}
+
+// 登入處理函數
+const handleLogin = async () => {
+  if (!username.value || !password.value) {
+    ElMessage.warning('請輸入帳號和密碼')
+    return
+  }
+
+  if (isLoading.value) return
+  isLoading.value = true
+
+  try {
+    const isAdmin = isAdminMode.value
+
+    // 清除舊數據
+    localStorage.removeItem('token')
+    sessionStorage.removeItem('userInfo')
+
+    const response = await axios.post(
+        `http://localhost:5000/api/${isAdmin ? 'admin' : 'user'}/login`,
+        {
+          account: username.value,
+          password: password.value,
+          isAdminMode: isAdmin
+        },
+        {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }
+    )
+
+    if (response.data.msg === '登入成功' && response.data.token) {
+      try {
+        // 保存 token
+        localStorage.setItem('token', response.data.token)
+
+        // 解析 token 並設置用戶信息
+        const tokenInfo = getTokenInfo(response.data.token)
+
+        if (!tokenInfo) {
+          throw new Error('Token parsing failed')
+        }
+
+        // 驗證用戶類型
+        if (isAdmin && tokenInfo.role !== 'admin') {
+          throw new Error('Invalid admin token')
+        }
+
+        // 顯示成功消息
+        ElMessage({
+          message: `${isAdmin ? '管理員' : '使用者'}登入成功`,
+          type: 'success',
+          duration: 2000
+        })
+
+        // 等待消息顯示後再跳轉
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        // 執行路由跳轉
+        await handleRouting(tokenInfo)
+
+      } catch (tokenError) {
+        console.error('Token processing error:', tokenError)
+        localStorage.removeItem('token')
+        sessionStorage.removeItem('userInfo')
+        ElMessage.error('登入過程發生錯誤，請重試')
+      }
+    } else {
+      ElMessage.error(response.data.msg || '登入失敗')
+    }
+  } catch (error) {
+    console.error('Login error:', error)
+    if (error.response) {
+      const { status, data } = error.response
+
+      if (isAdminMode.value) {
+        switch (status) {
+          case 403:
+            ElMessage.error(data.msg)
+            break
+          case 400:
+            if (data.attemptsLeft) {
+              ElMessage.error(`密碼錯誤，還剩 ${data.attemptsLeft} 次嘗試機會`)
+            } else {
+              ElMessage.error(data.msg)
+            }
+            break
+          default:
+            ElMessage.error('登入失敗，請稍後再試')
+        }
+      } else {
+        ElMessage.error(data.msg || '登入失敗，請稍後再試')
+      }
+    } else {
+      ElMessage.error('網路錯誤，請檢查連線')
+    }
+  } finally {
+    setTimeout(() => {
+      isLoading.value = false
+    }, 300)
+  }
+}
+
+// 組件掛載時進行檢查
+onMounted(async () => {
+  await checkLoginStatus()
+})
+</script>
 
 <style scoped>
 .login-container {
@@ -183,6 +258,7 @@ export default {
   min-height: calc(100vh - 120px);
   background-color: #f5f5f5;
 }
+
 .login-box {
   display: flex;
   background: #ffffff;
@@ -191,6 +267,7 @@ export default {
   overflow: hidden;
   width: 800px;
 }
+
 .login-left {
   flex: 1;
   padding: 2rem;
@@ -201,6 +278,7 @@ export default {
   align-items: center;
   text-align: center;
 }
+
 .login-right {
   flex: 1;
   padding: 2rem;
@@ -211,57 +289,65 @@ export default {
   transition: all 0.3s ease;
 }
 
-/* 管理員模式樣式 */
 .admin-mode {
   background-color: #1a1a1a;
 }
+
 .admin-mode h2,
 .admin-mode label {
-  color: #fff !important; /* 確保 h2 和 label 在管理員模式下都是白色 */
+  color: #fff !important;
 }
+
 .admin-mode .login-btn {
   background-color: #ff4444;
 }
+
 .admin-mode .login-btn:hover {
   background-color: #cc0000;
 }
+
 .admin-mode .form-input {
   background-color: #333;
   color: #fff;
   border-color: #444;
 }
+
 .admin-mode .password-toggle {
   color: #fff;
 }
+
 .admin-mode .form-input:focus {
   border-color: #ff4444;
 }
+
 .admin-mode .password-toggle:hover {
-  color: red; /* 滑鼠移上去時變紅色 */
+  color: red;
 }
-
-
 
 h2 {
   margin-bottom: 2rem;
   font-size: 1.8rem;
   color: #333;
-  cursor: default; /* 改為箭頭樣式 */
+  cursor: default;
   user-select: none;
 }
+
 h3 {
   margin-bottom: 1rem;
   font-size: 1.2rem;
   color: #666;
 }
+
 .form-group {
   margin-bottom: 1.5rem;
 }
+
 label {
   display: block;
   margin-bottom: 0.5rem;
   color: #666;
 }
+
 .form-input {
   width: 100%;
   padding: 0.8rem;
@@ -270,12 +356,12 @@ label {
   font-size: 1rem;
   transition: all 0.3s ease;
 }
+
 .form-input:focus {
   outline: none;
   border-color: #4a90e2;
 }
 
-/* 密碼輸入框相關樣式 */
 .password-input-wrapper {
   position: relative;
   width: 100%;
@@ -310,29 +396,35 @@ label {
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
+
 .login-btn:hover {
   background-color: #001f75;
 }
+
 p {
   color: #666;
   line-height: 1.6;
 }
+
 .login-image {
   width: 80%;
   max-width: 300px;
   margin: 2rem 0;
 }
+
 @media (max-width: 768px) {
   .login-box {
     flex-direction: column;
     width: 90%;
     margin: 1rem;
   }
+
   .login-left,
   .login-right {
     padding: 1.5rem;
   }
 }
+
 .login-right h2 {
   margin-bottom: 2rem;
   font-size: 1.8rem;
