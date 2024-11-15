@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <!-- 根據路由路徑切換導覽列 -->
-    <AdminNavbar v-if="isAdminRoute"/>
+    <AdminNavbar v-if="showAdminNavbar"/>
     <UserNavbar v-else-if="isUserRoute"/>
     <TheNavbar v-else/>
     <div class="main-content">
@@ -22,8 +22,10 @@ import TheFooter from '@/components/Footer.vue'
 const route = useRoute()
 const router = useRouter()
 
-// 檢查是否為管理員路由
-const isAdminRoute = computed(() => route.path.startsWith('/admin'))
+// 檢查是否為管理員路由，但排除 login 頁面
+const showAdminNavbar = computed(() =>
+    route.path.startsWith('/admin') && route.path !== '/admin/login'
+)
 
 // 檢查是否為已登入用戶路由
 const isUserRoute = computed(() => {

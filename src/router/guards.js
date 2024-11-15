@@ -89,11 +89,12 @@ export function setupGuards(router) {
             const token = localStorage.getItem('token');
             const tokenInfo = token ? getTokenInfo(token) : null;
 
-            // 處理根路徑訪問
-            if (to.path === '/') {
+            // 處理需要訪客狀態的路由（登入頁面）
+            if (to.meta.requiresGuest) {
                 if (tokenInfo) {
-                    // 如果是管理員
+                    // 如果已登入，根據角色重定向
                     if (tokenInfo.role === 'admin') {
+                        // 管理員重定向到管理面板
                         next('/admin');
                         return;
                     }
@@ -111,10 +112,7 @@ export function setupGuards(router) {
                         return;
                     }
                 }
-
-                // 未登入用戶或無效 token，清除數據並允許訪問登入頁
-                localStorage.removeItem('token');
-                sessionStorage.removeItem('userInfo');
+                // 未登入用戶允許訪問登入頁
                 next();
                 return;
             }
@@ -129,7 +127,9 @@ export function setupGuards(router) {
                         type: 'warning',
                         duration: 2000
                     });
-                    next('/');
+                    // 根據要訪問的路徑決定重定向到哪個登入頁
+                    const loginPath = to.path.startsWith('/admin') ? '/admin/login' : '/';
+                    next(loginPath);
                     return;
                 }
 
