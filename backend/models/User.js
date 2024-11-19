@@ -55,12 +55,23 @@ const userSchema = new mongoose.Schema({
     },
     extension: {
         type: String,
-        required: false
+        default: '',
+        validate: {
+            validator: function(v) {
+                return !v || /^\d{4}$/.test(v);
+            },
+            message: '分機號碼必須是4位數字'
+        }
     },
     email: {
         type: String,
         required: true,
         sparse: true
+    },
+    // 改用 base64 儲存圖片
+    avatar: {
+        type: String,  // base64 字串
+        default: null
     }
 }, {
     timestamps: true
@@ -75,6 +86,15 @@ userSchema.pre('save', function(next) {
         this.position = positionMap[this.position] || this.position;
     }
     next();
+});
+
+// 確保虛擬屬性被包含在 JSON 中
+userSchema.set('toJSON', {
+    virtuals: true,
+    transform: function(doc, ret) {
+        delete ret.password;  // 確保密碼不被包含在 JSON 中
+        return ret;
+    }
 });
 
 module.exports = mongoose.model('User', userSchema);

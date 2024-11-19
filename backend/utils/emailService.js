@@ -13,24 +13,69 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// 原有的帳號鎖定通知功能
-const sendLockAccountEmail = async (to, remainingTime, ipAddress) => {
+// 更新帳號鎖定通知功能，增加用戶類型區分
+// 更新帳號鎖定通知功能，區分管理員和使用者
+const sendLockAccountEmail = async (to, remainingTime, ipAddress, userType = 'user') => {
     try {
+        let emailTemplate;
+
+        if (userType === 'admin') {
+            // 管理員郵件模板（15分鐘自動解鎖）
+            emailTemplate = `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2 style="color: #d32f2f;">【系統管理員】帳號安全警告</h2>
+                    <div style="background-color: #fff3f3; padding: 15px; border-left: 4px solid #d32f2f; margin: 15px 0;">
+                        <p>您的管理員帳號因連續登入失敗已被系統暫時鎖定</p>
+                    </div>
+                    
+                    <div style="background-color: #f5f7fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">鎖定詳情</h3>
+                        <p><strong>鎖定原因：</strong>多次輸入錯誤密碼</p>
+                        <p><strong>自動解鎖時間：</strong>${remainingTime} 分鐘後</p>
+                        <p><strong>登入IP：</strong>${ipAddress}</p>
+                        <p><strong>鎖定時間：</strong>${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            // 使用者郵件模板（需管理員手動解鎖）
+            emailTemplate = `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2 style="color: #d32f2f;">帳號安全警告</h2>
+                    <div style="background-color: #fff3f3; padding: 15px; border-left: 4px solid #d32f2f; margin: 15px 0;">
+                        <p>您的帳號因連續登入失敗已被系統鎖定</p>
+                    </div>
+                    
+                    <div style="background-color: #f5f7fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">鎖定詳情</h3>
+                        <p><strong>鎖定原因：</strong>多次輸入錯誤密碼</p>
+                        <p><strong>解鎖方式：</strong>請聯繫系統管理員處理</p>
+                        <p><strong>登入IP：</strong>${ipAddress}</p>
+                        <p><strong>鎖定時間：</strong>${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
+                    </div>
+
+                    <div style="border-left: 4px solid #ffa726; padding: 15px; margin: 15px 0; background-color: #fff8e1;">
+                        <h3 style="color: #f57c00; margin-top: 0;">注意事項</h3>
+                        <p style="margin: 5px 0;">1. 請確認是否為本人操作</p>
+                        <p style="margin: 5px 0;">2. 如非本人操作，請立即通知系統管理員</p>
+                        <p style="margin: 5px 0;">3. 切勿將帳號密碼告知他人</p>
+                    </div>
+
+                    <div style="margin-top: 20px; padding: 15px; background-color: #f4f4f4; border-radius: 5px;">
+                        <p style="color: #666; margin: 0;">
+                            此為系統自動發送的通知信，請勿直接回覆。<br>
+                            如需協助，請聯繫您的系統管理員。
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
         const emailContent = {
             from: `"系統管理員" <${process.env.EMAIL_USER}>`,
             to: to,
-            subject: '【系統通知】帳號安全提醒',
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2 style="color: #d32f2f;">帳號安全提醒</h2>
-                    <p>您的帳號因多次登入失敗已被暫時鎖定</p>
-                    <p><strong>鎖定時間：</strong>${remainingTime} 分鐘</p>
-                    <p><strong>登入IP：</strong>${ipAddress}</p>
-                    <p><strong>時間：</strong>${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
-                    <hr>
-                    <p style="color: #d32f2f;">如果這不是您本人的操作，請儘速聯繫系統管理員。</p>
-                </div>
-            `
+            subject: userType === 'admin' ? '【系統管理員】帳號鎖定通知' : '【系統通知】帳號鎖定通知',
+            html: emailTemplate
         };
 
         const info = await transporter.sendMail(emailContent);
@@ -42,7 +87,7 @@ const sendLockAccountEmail = async (to, remainingTime, ipAddress) => {
     }
 };
 
-// 新增發送帳號資訊的功能
+// 保持原有的帳號建立通知功能
 const sendAccountCredentials = async (to, name, account, password) => {
     try {
         const emailContent = {
@@ -77,7 +122,7 @@ const sendAccountCredentials = async (to, name, account, password) => {
 };
 
 // 測試郵件連接
-transporter.verify((error, success) => {
+transporter.verify((error) => {
     if (error) {
         console.log('郵件服務器連接失敗:', error);
     } else {

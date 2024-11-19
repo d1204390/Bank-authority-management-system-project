@@ -140,6 +140,49 @@ const checkLoginStatus = async () => {
   }
 }
 
+
+// 處理錯誤響應
+const handleErrorResponse = (status, data, isAdmin) => {
+  switch (status) {
+    case 403:
+      // 處理帳號鎖定情況
+      if (data.lockUntil) {
+        const message = isAdmin
+            ? `帳號已被鎖定，請 ${Math.ceil((data.lockUntil - Date.now()) / 1000 / 60)} 分鐘後再試`
+            : '帳號已被鎖定，請聯繫系統管理員解鎖';
+
+        ElMessage({
+          message: message,
+          type: 'error',
+          duration: 5000,
+          showClose: true
+        });
+      } else {
+        ElMessage.error(data.msg);
+      }
+      break;
+    case 400:
+      // 處理密碼錯誤和剩餘嘗試次數
+      if (data.attemptsLeft !== undefined) {
+        const warning = isAdmin
+            ? `密碼錯誤，還剩 ${data.attemptsLeft} 次嘗試機會，超過將鎖定15分鐘`
+            : `密碼錯誤，還剩 ${data.attemptsLeft} 次嘗試機會，超過將鎖定且需聯繫管理員解鎖`;
+
+        ElMessage({
+          message: warning,
+          type: 'warning',
+          duration: 3000,
+          showClose: true
+        });
+      } else {
+        ElMessage.error(data.msg);
+      }
+      break;
+    default:
+      ElMessage.error(data.msg || '登入失敗，請稍後再試');
+  }
+};
+
 // 登入處理函數
 const handleLogin = async () => {
   if (!username.value || !password.value) {
@@ -214,28 +257,10 @@ const handleLogin = async () => {
   } catch (error) {
     console.error('Login error:', error)
     if (error.response) {
-      const { status, data } = error.response
-
-      if (isAdminMode.value) {
-        switch (status) {
-          case 403:
-            ElMessage.error(data.msg)
-            break
-          case 400:
-            if (data.attemptsLeft) {
-              ElMessage.error(`密碼錯誤，還剩 ${data.attemptsLeft} 次嘗試機會`)
-            } else {
-              ElMessage.error(data.msg)
-            }
-            break
-          default:
-            ElMessage.error('登入失敗，請稍後再試')
-        }
-      } else {
-        ElMessage.error(data.msg || '登入失敗，請稍後再試')
-      }
+      const { status, data } = error.response;
+      handleErrorResponse(status, data, isAdminMode.value);
     } else {
-      ElMessage.error('網路錯誤，請檢查連線')
+      ElMessage.error('網路錯誤，請檢查連線');
     }
   } finally {
     setTimeout(() => {

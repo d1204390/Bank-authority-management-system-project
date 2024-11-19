@@ -43,19 +43,147 @@
 
       <!-- 表格卡片 -->
       <el-card class="table-card">
-        <el-table :data="filteredEmployeeData" style="width: 100%">
-          <el-table-column prop="id" label="員編" width="100" />
-          <el-table-column prop="name" label="姓名" width="120" />
-          <el-table-column prop="department" label="部門" width="120" />
-          <el-table-column prop="position" label="職位" width="120" />
-          <el-table-column prop="extension" label="分機" width="100" />
-          <el-table-column prop="email" label="Email" min-width="200" />
-          <el-table-column label="操作" fixed="right" width="200">
+        <el-table
+            :data="filteredEmployeeData"
+            style="width: 100%"
+            :border="true"
+            :stripe="true"
+            highlight-current-row
+            @row-click="handleRowClick"
+        >
+          <!-- 員編 -->
+          <el-table-column
+              prop="id"
+              label="員編"
+              min-width="120"
+              show-overflow-tooltip
+          />
+
+          <!-- 姓名 -->
+          <el-table-column
+              prop="name"
+              label="姓名"
+              min-width="100"
+              show-overflow-tooltip
+          />
+
+          <!-- 部門 -->
+          <el-table-column
+              prop="department"
+              label="部門"
+              min-width="100"
+          />
+
+          <!-- 職位 -->
+          <el-table-column
+              prop="position"
+              label="職位"
+              min-width="100"
+          />
+
+          <el-table-column
+              label="帳號狀態"
+              min-width="200"
+              align="center"
+          >
+            <template #default="{ row }">
+              <div class="account-status">
+                <!-- 狀態標籤 -->
+                <el-tag
+                    :type="row.isLocked ? 'danger' : 'success'"
+                    :effect="row.isLocked ? 'dark' : 'light'"
+                    class="status-tag"
+                    size="small"
+                >
+                  <template #icon>
+                    <el-icon><CircleCheck v-if="!row.isLocked" /><CircleClose v-else /></el-icon>
+                  </template>
+                  {{ row.isLocked ? '已鎖定' : '正常' }}
+                </el-tag>
+
+                <!-- 狀態開關 -->
+                <el-switch
+                    v-model="row.isActive"
+                    :loading="row.isProcessing"
+                    :disabled="row.isProcessing"
+                    @change="(val) => handleAccountStatusChange(row, val)"
+                    active-text="啟用"
+                    inactive-text="鎖定"
+                    class="status-switch"
+                    :activeValue="true"
+                    :inactiveValue="false"
+                />
+
+                <!-- 狀態提示 -->
+                <el-tooltip
+                    :content="row.isLocked ?
+            `帳號已鎖定至 ${formatLockTime(row.lockUntil)}` :
+            '帳號使用正常'"
+                    placement="top"
+                    effect="dark"
+                    :show-after="500"
+                >
+                  <el-icon
+                      :class="['status-icon', { 'is-locked': row.isLocked }]"
+                  >
+                    <Lock v-if="row.isLocked" />
+                    <Unlock v-else />
+                  </el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+          </el-table-column>
+
+          <!-- 分機 -->
+          <el-table-column
+              prop="extension"
+              label="分機"
+              min-width="100"
+              show-overflow-tooltip
+              align="center"
+          />
+
+          <!-- Email -->
+          <el-table-column
+              prop="email"
+              label="Email"
+              min-width="200"
+              show-overflow-tooltip
+          />
+
+          <!-- 操作 -->
+          <el-table-column
+              label="操作"
+              fixed="right"
+              min-width="150"
+              align="center"
+          >
             <template #default="scope">
-              <el-button-group>
-                <el-button type="primary" @click="handleView(scope.row)" :icon="View" size="small" />
-                <el-button type="primary" @click="handleEdit(scope.row)" :icon="Edit" size="small" />
-                <el-button type="danger" @click="handleDelete(scope.row)" :icon="Delete" size="small" />
+              <el-button-group class="operation-buttons">
+                <el-tooltip content="查看詳情" placement="top" :show-after="500">
+                  <el-button
+                      type="primary"
+                      @click.stop="handleView(scope.row)"
+                      :icon="View"
+                      size="small"
+                  />
+                </el-tooltip>
+                <el-tooltip content="編輯資料" placement="top" :show-after="500">
+                  <el-button
+                      type="primary"
+                      @click.stop="handleEdit(scope.row)"
+                      :icon="Edit"
+                      size="small"
+                  />
+                </el-tooltip>
+                <el-tooltip content="刪除使用者" placement="top" :show-after="500">
+                  <el-button
+                      type="danger"
+                      @click.stop="handleDelete(scope.row)"
+                      :icon="Delete"
+                      size="small"
+                  />
+                </el-tooltip>
               </el-button-group>
             </template>
           </el-table-column>
@@ -137,7 +265,10 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
-import { Plus, Edit, View, Delete, Search, Refresh } from '@element-plus/icons-vue'
+import {
+  Plus, Edit, View, Delete, Search, Refresh,
+  Lock, Unlock, CircleCheck, CircleClose
+} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 
@@ -171,6 +302,13 @@ const positionMap = {
   'C': '科員'
 }
 
+// 部門職位對應表
+const prefixMap = {
+  '業務部': { '經理': 'BDM', '主管': 'BDS', '科員': 'BDC' },
+  '消金部': { '經理': 'FDM', '主管': 'FDS', '科員': 'FDC' },
+  '借貸部': { '經理': 'LDM', '主管': 'LDS', '科員': 'LDC' }
+}
+
 // 表單驗證規則
 const rules = {
   name: [
@@ -198,11 +336,16 @@ const form = reactive({
   email: ''
 })
 
-// 部門職位對應表
-const prefixMap = {
-  '業務部': { '經理': 'BDM', '主管': 'BDS', '科員': 'BDC' },
-  '消金部': { '經理': 'FDM', '主管': 'FDS', '科員': 'FDC' },
-  '借貸部': { '經理': 'LDM', '主管': 'LDS', '科員': 'LDC' }
+// 格式化鎖定時間
+const formatLockTime = (lockUntil) => {
+  if (!lockUntil) return ''
+  return new Date(lockUntil).toLocaleString('zh-TW', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 // 轉換部門代碼為中文
@@ -213,27 +356,6 @@ const convertDepartment = (code) => {
 // 轉換職位代碼為中文
 const convertPosition = (code) => {
   return positionMap[code] || code
-}
-
-// 獲取員工列表方法
-const fetchEmployees = async () => {
-  try {
-    const response = await axios.get('/api/user/employees')
-    employeeData.value = response.data.map(user => ({
-      id: user.account,
-      name: user.name,
-      department: convertDepartment(user.department),
-      position: convertPosition(user.position),
-      extension: user.extension,
-      username: user.account,
-      email: user.email,
-      raw_department: user.department,
-      raw_position: user.position
-    }))
-  } catch (error) {
-    console.error('獲取用戶列表失敗:', error)
-    ElMessage.error('獲取用戶列表失敗')
-  }
 }
 
 // 篩選後的員工數據
@@ -262,44 +384,97 @@ const filteredEmployeeData = computed(() => {
     result.sort((a, b) => {
       if (sortOrder.value === 'asc') {
         return a.id.localeCompare(b.id)
-      } else {
-        return b.id.localeCompare(a.id)
       }
+      return b.id.localeCompare(a.id)
     })
   }
 
   return result
 })
 
-// 開啟新增對話框
-const openAddEmployeeDialog = () => {
-  dialogVisible.value = true
-  isEdit.value = false
-  resetForm()
-  generateDefaultAccount()
-}
+// 獲取員工列表方法
+const fetchEmployees = async () => {
+  try {
+    const [usersResponse, lockStatusResponse] = await Promise.all([
+      axios.get('/api/user/employees'),
+      axios.get('/api/user/lock-status')
+    ])
 
-// 重置表單
-const resetForm = () => {
-  if (formRef.value) {
-    formRef.value.resetFields()
+    const lockStatusMap = new Map(
+        lockStatusResponse.data.map(status => [status.account, status])
+    )
+
+    employeeData.value = usersResponse.data.map(user => ({
+      id: user.account,
+      name: user.name,
+      department: convertDepartment(user.department),
+      position: convertPosition(user.position),
+      extension: user.extension,
+      username: user.account,
+      email: user.email,
+      raw_department: user.department,
+      raw_position: user.position,
+      isLocked: lockStatusMap.get(user.account)?.status === 'locked',
+      isActive: !(lockStatusMap.get(user.account)?.status === 'locked'),
+      lockUntil: lockStatusMap.get(user.account)?.lockUntil,
+      isProcessing: false
+    }))
+  } catch (error) {
+    console.error('獲取用戶列表失敗:', error)
+    ElMessage.error('獲取用戶列表失敗')
   }
-  form.name = ''
-  form.department = ''
-  form.position = ''
-  form.extension = ''
-  form.username = ''
-  form.password = ''
-  form.email = ''
 }
 
-// 重置進度
-const resetProgress = () => {
-  activeStep.value = 0
-  progressMessage.value = ''
-  progressVisible.value = false
-  isSubmitting.value = false
+// 處理帳號狀態變更
+const handleAccountStatusChange = async (row, newValue) => {
+  try {
+    row.isProcessing = true
+
+    // 使用 ElMessageBox.confirm() 會返回一個 Promise
+    // 當點擊取消時，Promise 會被 reject，進入 catch 區塊
+    await ElMessageBox.confirm(
+        `確定要${newValue ? '啟用' : '鎖定'}使用者 ${row.name} 的帳號嗎？`,
+        '確認操作',
+        {
+          confirmButtonText: '確定',
+          cancelButtonText: '取消',
+          type: newValue ? 'warning' : 'danger'
+        }
+    )
+
+    // 如果確認框沒有被取消，執行狀態更新
+    const response = await axios.post('/api/user/toggle-lock', {
+      account: row.username,
+      action: newValue ? 'unlock' : 'lock'
+    })
+
+    if (response.data.success) {
+      row.isLocked = !newValue
+      row.isActive = newValue
+      row.lockUntil = response.data.lockUntil
+      ElMessage.success(`已${newValue ? '啟用' : '鎖定'}使用者帳號`)
+    } else {
+      throw new Error(response.data.message)
+    }
+  } catch (error) {
+    // 當使用者點擊取消按鈕時，ElMessageBox 會拋出 'cancel' 字串
+    if (error === 'cancel') {
+      // 恢復原始狀態
+      row.isActive = !newValue
+      console.log('操作已取消')
+    } else {
+      // 處理其他錯誤
+      console.error('狀態更新失敗:', error)
+      ElMessage.error('操作失敗，請重試')
+      row.isActive = !newValue
+    }
+  } finally {
+    row.isProcessing = false
+  }
 }
+
+
+
 
 // 生成隨機密碼
 const generateRandomPassword = () => {
@@ -335,9 +510,34 @@ const generateDefaultAccount = () => {
   form.password = generateRandomPassword()
 }
 
-// 查看處理
-const handleView = () => {
-  ElMessage.info('查看功能開發中')
+// 開啟新增對話框
+const openAddEmployeeDialog = () => {
+  dialogVisible.value = true
+  isEdit.value = false
+  resetForm()
+  generateDefaultAccount()
+}
+
+// 重置表單
+const resetForm = () => {
+  if (formRef.value) {
+    formRef.value.resetFields()
+  }
+  form.name = ''
+  form.department = ''
+  form.position = ''
+  form.extension = ''
+  form.username = ''
+  form.password = ''
+  form.email = ''
+}
+
+// 重置進度
+const resetProgress = () => {
+  activeStep.value = 0
+  progressMessage.value = ''
+  progressVisible.value = false
+  isSubmitting.value = false
 }
 
 // 編輯處理
@@ -350,6 +550,11 @@ const handleEdit = (row) => {
     position: row.raw_position || row.position,
     email: row.email || ''
   })
+}
+
+// 查看處理
+const handleView = () => {
+  ElMessage.info('查看功能開發中')
 }
 
 // 刪除處理
@@ -389,12 +594,10 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     isSubmitting.value = true
 
-    // 顯示進度對話框
     progressVisible.value = true
     progressMessage.value = '正在保存用戶資料...'
     activeStep.value = 1
 
-    // 發送註冊請求
     const response = await axios.post('/api/user/register', {
       name: form.name,
       department: form.department,
@@ -404,7 +607,6 @@ const handleSubmit = async () => {
       email: form.email
     })
 
-    // 更新進度
     progressMessage.value = '正在生成帳號...'
     activeStep.value = 2
     await new Promise(resolve => setTimeout(resolve, 500))
@@ -449,6 +651,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 主要布局 */
 .employee-manage {
   min-height: 100vh;
   background-color: #f0f2f5;
@@ -456,8 +659,8 @@ onMounted(() => {
 }
 
 .content-wrapper {
-  max-width: 1200px;  /* 設置最大寬度 */
-  margin: 0 auto;     /* 水平置中 */
+  max-width: 1400px;
+  margin: 0 auto;
   padding: 20px;
   background-color: white;
   border-radius: 8px;
@@ -471,33 +674,126 @@ onMounted(() => {
   font-size: 24px;
 }
 
+/* 工具欄和篩選區 */
 .tool-bar {
   margin-bottom: 20px;
   display: flex;
-  justify-content: flex-end;  /* 按鈕靠右 */
+  justify-content: flex-end;
 }
 
 .filter-section {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 20px;
-  flex-wrap: wrap; /* 允許篩選項自動換行 */
-  justify-content: space-between;  /* 篩選器均勻分布 */
+  flex-wrap: nowrap;
+  justify-content: flex-start;
 }
 
 .search-input {
-  width: 300px;
+  width: 250px;
 }
 
+/* 表格相關 */
 .table-card {
   margin-top: 20px;
   border-radius: 8px;
-  display: flex;
-  justify-content: center;
-  overflow-x: auto; /* 讓表格在小螢幕上水平滾動 */
+  width: 100%;
+  overflow-x: hidden;
 }
 
-/* 進度對話框相關樣式 */
+:deep(.el-table) {
+  border-radius: 8px;
+}
+
+:deep(.el-table th) {
+  background-color: #f5f7fa;
+  color: #606266;
+  font-weight: bold;
+}
+
+:deep(.el-table .el-table__cell) {
+  padding: 8px 0;
+}
+
+:deep(.el-table .cell) {
+  padding: 0 8px;
+}
+
+/* 帳號狀態相關 */
+.account-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 65px;
+}
+
+.status-icon {
+  font-size: 16px;
+  color: #67c23a;
+  cursor: help;
+
+  &.is-locked {
+    color: #f56c6c;
+  }
+}
+
+/* Switch 開關樣式 */
+:deep(.el-switch) {
+  margin: 0 4px;
+
+  .el-switch__label {
+    font-size: 12px;
+    color: #666;
+
+    &.is-active {
+      color: #409EFF;
+    }
+  }
+
+  &.is-checked .el-switch__core {
+    background-color: #67c23a;
+    border-color: #67c23a;
+  }
+
+  &:not(.is-checked) .el-switch__core {
+    background-color: #f56c6c;
+    border-color: #f56c6c;
+  }
+}
+
+/* 標籤樣式 */
+.el-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+
+  .el-icon {
+    margin-right: 4px;
+    font-size: 14px;
+  }
+}
+
+/* 按鈕組 */
+:deep(.el-button-group) {
+  display: flex;
+  gap: 4px;
+}
+
+/* Select 下拉選單 */
+:deep(.el-select) {
+  width: 180px;
+}
+
+/* 進度條相關 */
 .progress-container {
   padding: 20px;
 }
@@ -510,32 +806,28 @@ onMounted(() => {
   min-height: 30px;
 }
 
-/* Element Plus 組件樣式調整 */
-:deep(.el-table) {
-  border-radius: 8px;
-}
-
-:deep(.el-table th) {
-  background-color: #f5f7fa;
-  color: #606266;
-  font-weight: bold;
-}
-
-:deep(.el-select) {
-  width: 200px;  /* 統一下拉選單寬度 */
-}
-
-:deep(.el-button-group) {
-  display: flex;
-  gap: 8px;
-}
-
 :deep(.el-steps) {
   margin-bottom: 20px;
 }
 
 :deep(.el-step__title) {
   font-size: 14px;
+}
+
+/* 對話框相關 */
+:deep(.el-dialog) {
+  .el-dialog__body {
+    padding: 20px;
+  }
+
+  .el-form-item__label {
+    font-weight: 500;
+  }
+
+  .el-input.is-disabled .el-input__inner {
+    background-color: #f5f7fa;
+    color: #909399;
+  }
 }
 
 /* 響應式設計 */
@@ -549,12 +841,12 @@ onMounted(() => {
   }
 
   .filter-section {
-    flex-direction: column; /* 垂直排列篩選項 */
+    flex-direction: column;
     align-items: flex-start;
   }
 
-  .search-input, .el-select {
-    width: 100%; /* 在小螢幕上占滿寬度 */
+  .search-input, :deep(.el-select) {
+    width: 100%;
   }
 }
 
@@ -565,7 +857,7 @@ onMounted(() => {
   }
 
   .tool-bar {
-    justify-content: center; /* 工具欄按鈕在小螢幕上居中 */
+    justify-content: center;
   }
 
   .table-card {
@@ -584,10 +876,6 @@ onMounted(() => {
 
   .filter-section {
     gap: 8px;
-  }
-
-  .search-input {
-    width: 100%;
   }
 
   :deep(.el-table-column) {
