@@ -57,10 +57,10 @@
             highlight-current-row
             @row-click="handleRowClick"
         >
-          <!-- 員編 -->
+          <!-- 職務代碼 -->
           <el-table-column
               prop="id"
-              label="員編"
+              label="職務代碼"
               min-width="120"
               show-overflow-tooltip
           />
@@ -85,6 +85,15 @@
               prop="position"
               label="職位"
               min-width="100"
+          />
+
+          <!-- 分機 -->
+          <el-table-column
+              prop="extension"
+              label="分機"
+              min-width="100"
+              show-overflow-tooltip
+              align="center"
           />
 
           <el-table-column
@@ -119,7 +128,6 @@
                     :activeValue="true"
                     :inactiveValue="false"
                 />
-
                 <!-- 狀態提示 -->
                 <el-tooltip
                     :content="row.isLocked ?
@@ -139,24 +147,6 @@
               </div>
             </template>
           </el-table-column>
-
-          <!-- 分機 -->
-          <el-table-column
-              prop="extension"
-              label="分機"
-              min-width="100"
-              show-overflow-tooltip
-              align="center"
-          />
-
-          <!-- Email -->
-          <el-table-column
-              prop="email"
-              label="Email"
-              min-width="200"
-              show-overflow-tooltip
-          />
-
           <!-- 操作 -->
           <el-table-column
               label="操作"
