@@ -57,18 +57,17 @@ const handleLoginFailure = async (loginAttempt, user, ipAddress) => {
     loginAttempt.lastAttempt = Date.now();
 
     if (loginAttempt.attempts >= MAX_LOGIN_ATTEMPTS) {
-        loginAttempt.status = 'locked';         // 設置狀態為鎖定
-        loginAttempt.lockUntil = null;          // 不需要設置解鎖時間，因為需要管理員手動解鎖
+        loginAttempt.status = 'locked';
+        loginAttempt.lockUntil = null;
         await loginAttempt.save();
 
-        // 發送鎖定通知郵件時不提供自動解鎖時間
+        // 發送鎖定通知郵件,明確標記為系統自動鎖定
         await sendLockAccountEmail(
             user.email,
             null,  // 不提供解鎖時間
             ipAddress,
             'user',
-            false,
-            '請聯繫系統管理員解鎖'  // 新增解鎖說明
+            false  // 標示為系統自動鎖定
         );
 
         return {
@@ -342,12 +341,13 @@ router.post('/toggle-lock', async (req, res) => {
 
             // 發送鎖定通知郵件
             const remainingTime = Math.ceil(LOCK_TIME / 1000 / 60);
+            // 在 lock 動作中的郵件發送
             await sendLockAccountEmail(
                 user.email,
                 remainingTime,
-                'System Admin',
+                req.ip || 'System Admin',  // 使用請求的 IP 或預設值
                 'user',
-                true // 標示為管理員手動鎖定
+                true  // 標示為管理員手動鎖定
             );
         } else {
             // 解鎖帳號
