@@ -314,6 +314,7 @@ const form = ref({
 const avatarUrl = ref('')
 
 // 表單驗證規則
+// 表單驗證規則
 const rules = {
   name: [
     { required: true, message: '請輸入姓名', trigger: 'blur' },
@@ -324,13 +325,15 @@ const rules = {
     { type: 'email', message: '請輸入正確的Email格式', trigger: 'blur' }
   ],
   extension: [
+    { required: true, message: '請輸入分機號碼', trigger: 'blur' },
     { pattern: /^\d{4}$/, message: '請輸入4位數的分機號碼', trigger: 'blur' }
   ],
-  personalPhone: [
-    { pattern: /^09\d{8}$/, message: '請輸入正確的手機號碼格式', trigger: 'blur' }
+  birthday: [
+    { required: true, message: '請選擇生日', trigger: 'blur' }
   ],
-  'emergencyContact.phone': [
-    { pattern: /(^09\d{8}$)|(^0[2-8]\d{7,8}$)/, message: '請輸入正確的電話號碼格式', trigger: 'blur' }
+  personalPhone: [
+    { required: true, message: '請輸入個人電話', trigger: 'blur' },
+    { pattern: /^09\d{8}$/, message: '請輸入正確的手機號碼格式', trigger: 'blur' }
   ],
   'emergencyContact.name': [
     { required: true, message: '請輸入緊急聯絡人姓名', trigger: 'blur' },
@@ -339,6 +342,10 @@ const rules = {
   'emergencyContact.relationship': [
     { required: true, message: '請輸入與緊急聯絡人關係', trigger: 'blur' },
     { max: 10, message: '關係說明不能超過 10 個字元', trigger: 'blur' }
+  ],
+  'emergencyContact.phone': [
+    { required: true, message: '請輸入緊急聯絡人電話', trigger: 'blur' },
+    { pattern: /(^09\d{8}$)|(^0[2-8]\d{7,8}$)/, message: '請輸入正確的電話號碼格式', trigger: 'blur' }
   ]
 };
 
