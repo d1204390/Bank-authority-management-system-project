@@ -216,11 +216,15 @@
             </el-select>
           </el-form-item>
           <el-form-item label="Email" prop="email">
-            <el-input
-                v-model="form.email"
-                type="email"
-                placeholder="請輸入電子郵件"
-            />
+            <div class="email-input-group">
+              <el-input
+                  v-model="emailPrefix"
+                  placeholder="請輸入電子郵件"
+                  @input="handleEmailInput"
+                  class="email-prefix-input"
+              />
+              <span class="email-domain">@gmail.com</span>
+            </div>
           </el-form-item>
           <el-form-item label="帳號">
             <el-input v-model="form.username" disabled placeholder="系統自動生成" />
@@ -282,6 +286,7 @@ const isEdit = ref(false)
 const employeeData = ref([])
 const formRef = ref(null)
 const isSubmitting = ref(false)
+const emailPrefix = ref('') // email 前綴的 ref
 
 // 進度相關的 ref
 const progressVisible = ref(false)
@@ -322,7 +327,17 @@ const rules = {
   ],
   email: [
     { required: true, message: '請輸入電子郵件', trigger: 'blur' },
-    { type: 'email', message: '請輸入有效的電子郵件地址', trigger: 'blur' }
+    {
+      validator: (rule, value, callback) => {
+        const prefix = value.split('@')[0]
+        if (!prefix || !/^[a-zA-Z0-9._%+-]+$/.test(prefix)) {
+          callback(new Error('電子郵件格式不正確'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
   ]
 }
 
@@ -335,6 +350,12 @@ const form = reactive({
   password: '',
   email: ''
 })
+
+// 處理 email 輸入
+const handleEmailInput = (value) => {
+  emailPrefix.value = value
+  form.email = value ? `${value}@gmail.com` : ''
+}
 
 // 格式化鎖定時間
 const formatLockTime = (lockUntil) => {
@@ -430,8 +451,6 @@ const handleAccountStatusChange = async (row, newValue) => {
   try {
     row.isProcessing = true
 
-    // 使用 ElMessageBox.confirm() 會返回一個 Promise
-    // 當點擊取消時，Promise 會被 reject，進入 catch 區塊
     await ElMessageBox.confirm(
         `確定要${newValue ? '啟用' : '鎖定'}使用者 ${row.name} 的帳號嗎？`,
         '確認操作',
@@ -442,7 +461,6 @@ const handleAccountStatusChange = async (row, newValue) => {
         }
     )
 
-    // 如果確認框沒有被取消，執行狀態更新
     const response = await axios.post('/api/user/toggle-lock', {
       account: row.username,
       action: newValue ? 'unlock' : 'lock'
@@ -457,13 +475,10 @@ const handleAccountStatusChange = async (row, newValue) => {
       throw new Error(response.data.message)
     }
   } catch (error) {
-    // 當使用者點擊取消按鈕時，ElMessageBox 會拋出 'cancel' 字串
     if (error === 'cancel') {
-      // 恢復原始狀態
       row.isActive = !newValue
       console.log('操作已取消')
     } else {
-      // 處理其他錯誤
       console.error('狀態更新失敗:', error)
       ElMessage.error('操作失敗，請重試')
       row.isActive = !newValue
@@ -472,9 +487,6 @@ const handleAccountStatusChange = async (row, newValue) => {
     row.isProcessing = false
   }
 }
-
-
-
 
 // 生成隨機密碼
 const generateRandomPassword = () => {
@@ -530,6 +542,7 @@ const resetForm = () => {
   form.username = ''
   form.password = ''
   form.email = ''
+  emailPrefix.value = '' // 重置 email 前綴
 }
 
 // 重置進度
@@ -550,6 +563,8 @@ const handleEdit = (row) => {
     position: row.raw_position || row.position,
     email: row.email || ''
   })
+  // 設置 email 前綴
+  emailPrefix.value = form.email ? form.email.split('@')[0] : ''
 }
 
 // 查看處理
@@ -742,6 +757,28 @@ onMounted(() => {
   &.is-locked {
     color: #f56c6c;
   }
+}
+
+.email-input-group {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.email-prefix-input {
+  flex: 1;
+}
+
+.email-domain {
+  margin-left: 8px;
+  padding: 0 12px;
+  height: 32px;
+  line-height: 32px;
+  background-color: #f5f7fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  color: #606266;
+  white-space: nowrap;
 }
 
 /* Switch 開關樣式 */
