@@ -161,12 +161,19 @@
                   />
                 </el-form-item>
 
-                <el-form-item label="Email" prop="email">
-                  <el-input
-                      v-model="form.email"
-                      :readonly="!isEditing"
-                      class="custom-input"
-                  />
+                <el-form-item label="Email" prop="gmailPrefix">
+                  <div class="gmail-input-container">
+                    <el-input
+                        v-model="form.gmailPrefix"
+                        :readonly="!isEditing"
+                        class="custom-input gmail-prefix"
+                        placeholder="請輸入 Gmail 帳號"
+                    >
+                      <template #append>
+                        <span class="gmail-suffix">@gmail.com</span>
+                      </template>
+                    </el-input>
+                  </div>
                 </el-form-item>
 
                 <el-form-item label="分機" prop="extension">
@@ -299,6 +306,7 @@ const form = ref({
   department: '',
   position: '',
   email: '',
+  gmailPrefix: '',
   extension: '',
   createdAt: '',
   birthday: '',
@@ -346,6 +354,23 @@ const rules = {
   'emergencyContact.phone': [
     { required: true, message: '請輸入緊急聯絡人電話', trigger: 'blur' },
     { pattern: /(^09\d{8}$)|(^0[2-8]\d{7,8}$)/, message: '請輸入正確的電話號碼格式', trigger: 'blur' }
+  ],
+  gmailPrefix: [
+    { required: true, message: '請輸入 Gmail 帳號', trigger: 'blur' },
+    {
+      pattern: /^[a-zA-Z0-9._%+-]+$/,
+      message: 'Gmail 帳號只能包含字母、數字和特殊符號(._%+-)'
+    },
+    {
+      validator: (rule, value, callback) => {
+        if (value && value.includes('@')) {
+          callback(new Error('請只輸入 @ 之前的部分'));
+        } else {
+          callback();
+        }
+      },
+      trigger: 'blur'
+    }
   ]
 };
 
@@ -386,9 +411,13 @@ const handleAvatarChange = (file) => {
 const fetchUserInfo = async () => {
   try {
     const response = await axios.get('/api/user/profile')
+    const email = response.data.email
+    const gmailPrefix = email.split('@')[0]  // 分離出 @ 前的部分
+
     form.value = {
       ...response.data,
-      employeeId: response.data.employeeId
+      employeeId: response.data.employeeId,
+      gmailPrefix: gmailPrefix  // 設置 Gmail 前綴
     }
     avatarUrl.value = response.data.avatar || ''
     originalAvatarUrl.value = response.data.avatar || ''
@@ -399,6 +428,7 @@ const fetchUserInfo = async () => {
 }
 
 // 切換編輯狀態
+// 在 UserProfile.vue 中修改 toggleEdit 函數
 const toggleEdit = async () => {
   if (isEditing.value) {
     try {
@@ -435,10 +465,13 @@ const toggleEdit = async () => {
         avatarUrl.value = uploadResult
       }
 
+      // 構建完整的 email
+      const fullEmail = `${form.value.gmailPrefix}@gmail.com`
+
       // 更新其他資料
       await axios.put('/api/user/profile', {
         name: form.value.name,
-        email: form.value.email,
+        email: fullEmail,  // 發送完整的 email
         extension: form.value.extension,
         birthday: form.value.birthday,
         personalPhone: form.value.personalPhone,
@@ -466,7 +499,8 @@ const toggleEdit = async () => {
       }
       if (error !== 'cancel') {
         console.error('更新失敗:', error)
-        ElMessage.error('資料更新失敗，請重試')
+        const errorMessage = error.response?.data?.msg || '資料更新失敗，請重試'
+        ElMessage.error(errorMessage)
       }
     }
   }
@@ -929,5 +963,23 @@ const formatDate = (date, includeTime = true) => {
   margin-top: 2rem;
   padding-top: 1rem;
   border-top: 1px solid #eee;
+}
+
+.gmail-input-container {
+  position: relative;
+  width: 100%;
+}
+
+:deep(.gmail-prefix .el-input-group__append) {
+  background-color: #f5f7fa;
+  color: #606266;
+  padding: 0 12px;
+  font-size: 14px;
+  border-radius: 0 8px 8px 0;
+}
+
+:deep(.gmail-prefix.is-disabled .el-input-group__append) {
+  background-color: #f5f7fa;
+  color: #909399;
 }
 </style>

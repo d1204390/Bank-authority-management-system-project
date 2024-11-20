@@ -452,9 +452,14 @@ router.put('/profile', async (req, res) => {
         } = req.body;
 
         // 驗證 Email 格式
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({ msg: '無效的電子郵件格式' });
+        if (!email.endsWith('@gmail.com')) {
+            return res.status(400).json({ msg: '電子郵件必須是 Gmail 帳號' });
+        }
+        // 驗證 Email 前綴格式
+        const emailPrefix = email.split('@')[0];
+        const emailPrefixRegex = /^[a-zA-Z0-9._%+-]+$/;
+        if (!emailPrefixRegex.test(emailPrefix)) {
+            return res.status(400).json({ msg: 'Gmail 帳號格式不正確' });
         }
 
         // 驗證手機號碼格式（如果有提供）
