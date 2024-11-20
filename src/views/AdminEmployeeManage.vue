@@ -35,6 +35,12 @@
           <el-option label="科員" value="科員" />
         </el-select>
 
+        <el-select v-model="accountStatusFilter" placeholder="帳號狀態">
+          <el-option label="全部" value="" />
+          <el-option label="正常" value="active" />
+          <el-option label="已鎖定" value="locked" />
+        </el-select>
+
         <el-select v-model="sortOrder" placeholder="排序方式">
           <el-option label="員編 (升冪)" value="asc" />
           <el-option label="員編 (降冪)" value="desc" />
@@ -287,6 +293,7 @@ const employeeData = ref([])
 const formRef = ref(null)
 const isSubmitting = ref(false)
 const emailPrefix = ref('') // email 前綴的 ref
+const accountStatusFilter = ref('')
 
 // 進度相關的 ref
 const progressVisible = ref(false)
@@ -383,24 +390,35 @@ const convertPosition = (code) => {
 const filteredEmployeeData = computed(() => {
   let result = [...employeeData.value]
 
+  // 姓名搜尋
   if (searchQuery.value) {
     result = result.filter(employee =>
         employee.name.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
   }
 
+  // 部門篩選
   if (departmentFilter.value) {
     result = result.filter(employee =>
         employee.department === departmentFilter.value
     )
   }
 
+  // 職位篩選
   if (positionFilter.value) {
     result = result.filter(employee =>
         employee.position === positionFilter.value
     )
   }
 
+  // 帳號狀態篩選
+  if (accountStatusFilter.value) {
+    result = result.filter(employee =>
+        accountStatusFilter.value === 'locked' ? employee.isLocked : !employee.isLocked
+    )
+  }
+
+  // 排序
   if (sortOrder.value) {
     result.sort((a, b) => {
       if (sortOrder.value === 'asc') {
@@ -657,6 +675,7 @@ const resetFilters = () => {
   departmentFilter.value = ''
   positionFilter.value = ''
   sortOrder.value = ''
+  accountStatusFilter.value = ''
 }
 
 // 組件載入時獲取數據
