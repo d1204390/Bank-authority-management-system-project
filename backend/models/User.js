@@ -19,6 +19,17 @@ const positionMap = {
 };
 
 const userSchema = new mongoose.Schema({
+    employeeId: {
+        type: String,
+        required: true,
+        unique: true,
+        validate: {
+            validator: function(v) {
+                return /^\d{9}$/.test(v);  // 格式為 YYYYMM + 3位數字
+            },
+            message: '員工編號格式不正確'
+        }
+    },
     name: {
         type: String,
         required: true
@@ -68,16 +79,34 @@ const userSchema = new mongoose.Schema({
         required: true,
         sparse: true
     },
-    // 改用 base64 儲存圖片
     avatar: {
-        type: String,  // base64 字串
+        type: String,
         default: null
     }
 }, {
     timestamps: true
 });
 
-// 添加中間件以確保保存前轉換格式
+// 添加靜態方法來生成新的員工編號
+userSchema.statics.generateEmployeeId = async function() {
+    const currentDate = new Date();
+    const yearMonth = `${currentDate.getFullYear()}${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+
+    // 查找當前月份最大的員工編號
+    const lastEmployee = await this.findOne({
+        employeeId: new RegExp(`^${yearMonth}`)
+    }).sort({ employeeId: -1 });
+
+    if (!lastEmployee) {
+        return `${yearMonth}001`;
+    }
+
+    const lastSequence = parseInt(lastEmployee.employeeId.slice(-3));
+    const newSequence = String(lastSequence + 1).padStart(3, '0');
+    return `${yearMonth}${newSequence}`;
+};
+
+// 中間件保持不變
 userSchema.pre('save', function(next) {
     if (this.isModified('department')) {
         this.department = departmentMap[this.department] || this.department;
@@ -88,11 +117,10 @@ userSchema.pre('save', function(next) {
     next();
 });
 
-// 確保虛擬屬性被包含在 JSON 中
 userSchema.set('toJSON', {
     virtuals: true,
     transform: function(doc, ret) {
-        delete ret.password;  // 確保密碼不被包含在 JSON 中
+        delete ret.password;
         return ret;
     }
 });

@@ -15,6 +15,16 @@
 
       <!-- 搜尋和篩選 -->
       <div class="filter-section">
+        <el-input
+            v-model="employeeIdQuery"
+            placeholder="員工編號搜尋"
+            class="search-input"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+
         <el-input v-model="searchQuery" placeholder="姓名關鍵字搜尋" class="search-input">
           <template #prefix>
             <el-icon><Search /></el-icon>
@@ -57,6 +67,18 @@
             highlight-current-row
             @row-click="handleRowClick"
         >
+          <!-- 員工編號 -->
+          <el-table-column
+              prop="employeeId"
+              label="員工編號"
+              min-width="120"
+              show-overflow-tooltip
+          >
+            <template #default="{ row }">
+              {{ row.employeeId || '無編號' }}
+            </template>
+          </el-table-column>
+
           <!-- 職務代碼 -->
           <el-table-column
               prop="id"
@@ -249,6 +271,7 @@
       >
         <div class="progress-container">
           <el-steps :active="activeStep" finish-status="success">
+            <el-step title="生成員工編號" />
             <el-step title="保存資料" />
             <el-step title="生成帳號" />
             <el-step title="發送郵件" />
@@ -284,6 +307,7 @@ const formRef = ref(null)
 const isSubmitting = ref(false)
 const emailPrefix = ref('') // email 前綴的 ref
 const accountStatusFilter = ref('')
+const employeeIdQuery = ref('') // 新增員工編號搜尋
 
 // 進度相關的 ref
 const progressVisible = ref(false)
@@ -380,6 +404,13 @@ const convertPosition = (code) => {
 const filteredEmployeeData = computed(() => {
   let result = [...employeeData.value]
 
+  // 員工編號搜尋
+  if (employeeIdQuery.value) {
+    result = result.filter(employee =>
+        employee.employeeId?.toString().includes(employeeIdQuery.value)
+    )
+  }
+
   // 姓名搜尋
   if (searchQuery.value) {
     result = result.filter(employee =>
@@ -411,10 +442,14 @@ const filteredEmployeeData = computed(() => {
   // 排序
   if (sortOrder.value) {
     result.sort((a, b) => {
+      // 確保存在員工編號，如果不存在則使用空字符串作為預設值
+      const aId = a.employeeId || '';
+      const bId = b.employeeId || '';
+
       if (sortOrder.value === 'asc') {
-        return a.id.localeCompare(b.id)
+        return aId.localeCompare(bId)
       }
-      return b.id.localeCompare(a.id)
+      return bId.localeCompare(aId)
     })
   }
 
@@ -434,6 +469,7 @@ const fetchEmployees = async () => {
     )
 
     employeeData.value = usersResponse.data.map(user => ({
+      employeeId: user.employeeId,
       id: user.account,
       name: user.name,
       department: convertDepartment(user.department),
@@ -618,10 +654,19 @@ const handleSubmit = async () => {
     isSubmitting.value = true
 
     progressVisible.value = true
-    progressMessage.value = '正在保存用戶資料...'
+    progressMessage.value = '正在生成員工編號...'
     activeStep.value = 1
 
+    // 先獲取新的員工編號
+    const employeeIdResponse = await axios.get('/api/user/generate-employee-id')
+    const employeeId = employeeIdResponse.data.employeeId
+
+    progressMessage.value = '正在保存用戶資料...'
+    activeStep.value = 2
+
+    // 在提交數據時包含員工編號
     const response = await axios.post('/api/user/register', {
+      employeeId,  // 添加員工編號
       name: form.name,
       department: form.department,
       position: form.position,
@@ -631,11 +676,11 @@ const handleSubmit = async () => {
     })
 
     progressMessage.value = '正在生成帳號...'
-    activeStep.value = 2
+    activeStep.value = 3
     await new Promise(resolve => setTimeout(resolve, 500))
 
     progressMessage.value = '正在發送郵件通知...'
-    activeStep.value = 3
+    activeStep.value = 4  // 步驟數增加了
     await new Promise(resolve => setTimeout(resolve, 1000))
 
     if (response.status === 201) {
@@ -661,6 +706,7 @@ const handleSubmit = async () => {
 
 // 重置篩選
 const resetFilters = () => {
+  employeeIdQuery.value = ''
   searchQuery.value = ''
   departmentFilter.value = ''
   positionFilter.value = ''

@@ -110,7 +110,7 @@ const generateToken = (user, department, position) => {
 
 // 使用者註冊路由
 router.post('/register', async (req, res) => {
-    const { name, department, position, account, password, email } = req.body;
+    const { name, department, position, account, password, email, employeeId } = req.body;
 
     if (!validateFields([
         { name: 'name', value: name },
@@ -118,12 +118,17 @@ router.post('/register', async (req, res) => {
         { name: 'position', value: position },
         { name: 'account', value: account },
         { name: 'password', value: password },
-        { name: 'email', value: email }
+        { name: 'email', value: email },
+        { name: 'employeeId', value: employeeId }  // 添加員工編號驗證
     ], res)) return;
 
     try {
         if (await User.exists({ account })) {
             return res.status(400).json({ msg: '帳號已存在' });
+        }
+
+        if (await User.exists({ employeeId })) {  // 檢查員工編號是否已存在
+            return res.status(400).json({ msg: '員工編號已存在' });
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -133,6 +138,7 @@ router.post('/register', async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = await User.create({
+            employeeId,  // 添加員工編號
             name,
             department,
             position,
@@ -249,10 +255,21 @@ router.post('/login', async (req, res) => {
 // 獲取所有使用者
 router.get('/employees', async (req, res) => {
     try {
-        const users = await User.find({}, '-password');
+        const users = await User.find({}, '-password').select('+employeeId');  // 確保返回員工編號
         res.json(users);
     } catch (error) {
         console.error('獲取使用者列表失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+// 生成員工編號
+router.get('/generate-employee-id', async (req, res) => {
+    try {
+        const employeeId = await User.generateEmployeeId();
+        res.json({ employeeId });
+    } catch (error) {
+        console.error('生成員工編號失敗:', error);
         res.status(500).json({ msg: '伺服器錯誤' });
     }
 });
