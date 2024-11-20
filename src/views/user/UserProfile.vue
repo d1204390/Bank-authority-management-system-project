@@ -8,17 +8,42 @@
           <h1 class="page-title">個人資料</h1>
           <p class="subtitle">查看和管理您的個人資訊</p>
         </div>
-        <el-button
-            type="primary"
-            class="edit-button"
-            :class="{ 'is-editing': isEditing }"
-            @click="toggleEdit"
-        >
-          <el-icon class="button-icon">
-            <component :is="isEditing ? Check : Edit" />
-          </el-icon>
-          {{ isEditing ? '儲存變更' : '編輯資料' }}
-        </el-button>
+        <div class="button-group">
+          <template v-if="isEditing">
+            <el-button
+                type="info"
+                class="edit-button"
+                @click="cancelEdit"
+            >
+              <el-icon class="button-icon">
+                <Close />
+              </el-icon>
+              取消編輯
+            </el-button>
+            <el-button
+                type="primary"
+                class="edit-button is-editing"
+                @click="toggleEdit"
+            >
+              <el-icon class="button-icon">
+                <Check />
+              </el-icon>
+              儲存變更
+            </el-button>
+          </template>
+          <template v-else>
+            <el-button
+                type="primary"
+                class="edit-button"
+                @click="startEdit"
+            >
+              <el-icon class="button-icon">
+                <Edit />
+              </el-icon>
+              編輯資料
+            </el-button>
+          </template>
+        </div>
       </div>
 
       <div class="profile-grid">
@@ -54,6 +79,16 @@
 
             <div class="basic-info">
               <h2 class="user-name">{{ form.name || '載入中...' }}</h2>
+              <div class="user-info">
+                <p class="id-item">
+                  <span class="id-label">員工編號</span>
+                  <span class="id-value">{{ form.employeeId || '載入中...' }}</span>
+                </p>
+                <p class="id-item">
+                  <span class="id-label">職務代碼</span>
+                  <span class="id-value">{{ form.account || '載入中...' }}</span>
+                </p>
+              </div>
               <div class="user-title">
                 <el-tag
                     class="department-tag"
@@ -70,7 +105,6 @@
                   {{ getPositionName(form.position) || '載入中...' }}
                 </el-tag>
               </div>
-              <p class="user-id">員工編號：{{ form.account }}</p>
             </div>
           </div>
         </el-card>
@@ -97,57 +131,119 @@
               class="details-form"
               :disabled="!isEditing"
           >
-            <div class="form-grid">
-              <el-form-item label="姓名" prop="name">
-                <el-input
-                    v-model="form.name"
-                    :readonly="!isEditing"
-                    class="custom-input"
-                />
-              </el-form-item>
+            <!-- 基本資料區塊 -->
+            <div class="form-section">
+              <h4 class="section-title">基本資料</h4>
+              <div class="form-grid">
+                <el-form-item label="姓名" prop="name">
+                  <el-input
+                      v-model="form.name"
+                      :readonly="!isEditing"
+                      class="custom-input"
+                  />
+                </el-form-item>
 
-              <el-form-item label="部門">
-                <el-input
-                    :modelValue="getDepartmentName(form.department)"
-                    readonly
-                    class="custom-input readonly-field"
-                    :disabled="true"
-                />
-              </el-form-item>
+                <el-form-item label="部門">
+                  <el-input
+                      :modelValue="getDepartmentName(form.department)"
+                      readonly
+                      class="custom-input readonly-field"
+                      :disabled="true"
+                  />
+                </el-form-item>
 
-              <el-form-item label="職位">
-                <el-input
-                    :modelValue="getPositionName(form.position)"
-                    readonly
-                    class="custom-input readonly-field"
-                    :disabled="true"
-                />
-              </el-form-item>
+                <el-form-item label="職位">
+                  <el-input
+                      :modelValue="getPositionName(form.position)"
+                      readonly
+                      class="custom-input readonly-field"
+                      :disabled="true"
+                  />
+                </el-form-item>
 
-              <el-form-item label="Email" prop="email">
-                <el-input
-                    v-model="form.email"
-                    :readonly="!isEditing"
-                    class="custom-input"
-                />
-              </el-form-item>
+                <el-form-item label="Email" prop="email">
+                  <el-input
+                      v-model="form.email"
+                      :readonly="!isEditing"
+                      class="custom-input"
+                  />
+                </el-form-item>
 
-              <el-form-item label="分機" prop="extension">
-                <el-input
-                    v-model="form.extension"
-                    :readonly="!isEditing"
-                    class="custom-input"
-                />
-              </el-form-item>
+                <el-form-item label="分機" prop="extension">
+                  <el-input
+                      v-model="form.extension"
+                      :readonly="!isEditing"
+                      class="custom-input"
+                  />
+                </el-form-item>
 
-              <el-form-item label="加入時間">
-                <el-input
-                    :modelValue="formatDate(form.createdAt)"
-                    readonly
-                    class="custom-input readonly-field"
-                    :disabled="true"
-                />
-              </el-form-item>
+                <el-form-item label="生日" prop="birthday">
+                  <el-date-picker
+                      v-model="form.birthday"
+                      type="date"
+                      :disabled="!isEditing"
+                      placeholder="請選擇生日"
+                      format="YYYY/MM/DD"
+                      value-format="YYYY-MM-DD"
+                      class="custom-input"
+                  />
+                </el-form-item>
+
+                <el-form-item label="個人電話" prop="personalPhone">
+                  <el-input
+                      v-model="form.personalPhone"
+                      :readonly="!isEditing"
+                      class="custom-input"
+                      placeholder="請輸入手機號碼"
+                  />
+                </el-form-item>
+
+                <el-form-item label="加入時間">
+                  <el-input
+                      :modelValue="formatDate(form.createdAt)"
+                      readonly
+                      class="custom-input readonly-field"
+                      :disabled="true"
+                  />
+                </el-form-item>
+              </div>
+            </div>
+
+            <!-- 緊急聯絡人區塊 -->
+            <div class="form-section emergency-contact-section">
+              <h4 class="section-title">緊急聯絡人資料</h4>
+              <div class="form-grid">
+                <el-form-item label="姓名" prop="emergencyContact.name">
+                  <el-input
+                      v-model="form.emergencyContact.name"
+                      :readonly="!isEditing"
+                      class="custom-input"
+                      placeholder="請輸入緊急聯絡人姓名"
+                  />
+                </el-form-item>
+
+                <el-form-item label="關係" prop="emergencyContact.relationship">
+                  <el-input
+                      v-model="form.emergencyContact.relationship"
+                      :readonly="!isEditing"
+                      class="custom-input"
+                      placeholder="請輸入與緊急聯絡人關係"
+                  />
+                </el-form-item>
+
+                <el-form-item
+                    label="聯絡電話"
+                    prop="emergencyContact.phone"
+                    class="grid-full-width"
+                >
+                  <el-input
+                      v-model="form.emergencyContact.phone"
+                      :readonly="!isEditing"
+                      class="custom-input"
+                      placeholder="請輸入緊急聯絡人電話"
+                  />
+                </el-form-item>
+              </div>
             </div>
           </el-form>
 
@@ -183,13 +279,18 @@ import {
   Edit,
   Check,
   UserFilled,
-  Camera
+  Camera,
+  Close
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 // refs
 const formRef = ref(null)
 const isEditing = ref(false)
+const originalForm = ref(null)
+const originalAvatarUrl = ref('')
+const tempAvatarFile = ref(null)  // 暫存選擇的檔案
+const tempAvatarUrl = ref('')     // 暫存的預覽 URL
 
 // 表單數據
 const form = ref({
@@ -199,7 +300,14 @@ const form = ref({
   position: '',
   email: '',
   extension: '',
-  createdAt: ''
+  createdAt: '',
+  birthday: '',
+  personalPhone: '',
+  emergencyContact: {
+    name: '',
+    phone: '',
+    relationship: ''
+  }
 })
 
 // 頭像相關
@@ -217,8 +325,22 @@ const rules = {
   ],
   extension: [
     { pattern: /^\d{4}$/, message: '請輸入4位數的分機號碼', trigger: 'blur' }
+  ],
+  personalPhone: [
+    { pattern: /^09\d{8}$/, message: '請輸入正確的手機號碼格式', trigger: 'blur' }
+  ],
+  'emergencyContact.phone': [
+    { pattern: /(^09\d{8}$)|(^0[2-8]\d{7,8}$)/, message: '請輸入正確的電話號碼格式', trigger: 'blur' }
+  ],
+  'emergencyContact.name': [
+    { required: true, message: '請輸入緊急聯絡人姓名', trigger: 'blur' },
+    { min: 2, max: 20, message: '姓名長度應在 2 到 20 個字元之間', trigger: 'blur' }
+  ],
+  'emergencyContact.relationship': [
+    { required: true, message: '請輸入與緊急聯絡人關係', trigger: 'blur' },
+    { max: 10, message: '關係說明不能超過 10 個字元', trigger: 'blur' }
   ]
-}
+};
 
 // 照片上傳前驗證
 const beforeAvatarUpload = (file) => {
@@ -242,32 +364,27 @@ const handleAvatarChange = (file) => {
     return
   }
 
-  const reader = new FileReader()
-  reader.readAsDataURL(file.raw)
-  reader.onload = async () => {
-    try {
-      const response = await axios.post('/api/user/upload-avatar', {
-        base64Image: reader.result
-      })
-
-      if (response.data.avatar) {
-        avatarUrl.value = response.data.avatar
-        ElMessage.success('照片上傳成功')
-      }
-    } catch (error) {
-      console.error('上傳錯誤:', error)
-      const errorMessage = error.response?.data?.msg || error.message || '未知錯誤'
-      ElMessage.error(`照片上傳失敗: ${errorMessage}`)
+    // 只讀取預覽，不立即上傳
+    const reader = new FileReader()
+    reader.readAsDataURL(file.raw)
+    reader.onload = () => {
+      tempAvatarFile.value = file.raw
+      tempAvatarUrl.value = reader.result
+      avatarUrl.value = reader.result  // 更新顯示的頭像
     }
   }
-}
+
 
 // 獲取用戶資料
 const fetchUserInfo = async () => {
   try {
     const response = await axios.get('/api/user/profile')
-    form.value = response.data
+    form.value = {
+      ...response.data,
+      employeeId: response.data.employeeId
+    }
     avatarUrl.value = response.data.avatar || ''
+    originalAvatarUrl.value = response.data.avatar || ''
   } catch (error) {
     console.error('獲取用戶資料失敗:', error)
     ElMessage.error('獲取用戶資料失敗')
@@ -289,22 +406,98 @@ const toggleEdit = async () => {
           }
       )
 
+      // 如果有新的頭像，先上傳
+      if (tempAvatarFile.value) {
+        const reader = new FileReader()
+        reader.readAsDataURL(tempAvatarFile.value)
+
+        const uploadResult = await new Promise((resolve, reject) => {
+          reader.onload = async () => {
+            try {
+              const response = await axios.post('/api/user/upload-avatar', {
+                base64Image: reader.result
+              })
+              resolve(response.data.avatar)
+            } catch (error) {
+              reject(error)
+            }
+          }
+        })
+
+        // 上傳成功後更新 URL
+        avatarUrl.value = uploadResult
+      }
+
+      // 更新其他資料
       await axios.put('/api/user/profile', {
         name: form.value.name,
         email: form.value.email,
-        extension: form.value.extension
+        extension: form.value.extension,
+        birthday: form.value.birthday,
+        personalPhone: form.value.personalPhone,
+        emergencyContact: {
+          name: form.value.emergencyContact?.name,
+          phone: form.value.emergencyContact?.phone,
+          relationship: form.value.emergencyContact?.relationship
+        }
       })
 
       ElMessage.success('資料更新成功')
       isEditing.value = false
+
+      // 更新原始資料
+      originalForm.value = JSON.parse(JSON.stringify(form.value))
+      originalAvatarUrl.value = avatarUrl.value
+
+      // 清除暫存的頭像資料
+      tempAvatarFile.value = null
+      tempAvatarUrl.value = ''
+
     } catch (error) {
+      if (error?.message?.includes('validation')) {
+        return
+      }
       if (error !== 'cancel') {
         console.error('更新失敗:', error)
         ElMessage.error('資料更新失敗，請重試')
       }
     }
-  } else {
-    isEditing.value = true
+  }
+}
+
+// 開始編輯
+const startEdit = () => {
+  originalForm.value = JSON.parse(JSON.stringify(form.value))
+  originalAvatarUrl.value = avatarUrl.value
+  isEditing.value = true
+}
+
+// 取消編輯
+const cancelEdit = async () => {
+  try {
+    await ElMessageBox.confirm(
+        '確定要取消編輯嗎？未儲存的變更將會遺失',
+        '確認取消',
+        {
+          confirmButtonText: '確定',
+          cancelButtonText: '返回編輯',
+          type: 'warning'
+        }
+    )
+
+    // 恢復表單資料
+    form.value = JSON.parse(JSON.stringify(originalForm.value))
+    avatarUrl.value = originalAvatarUrl.value
+
+    // 清除暫存的頭像資料
+    tempAvatarFile.value = null
+    tempAvatarUrl.value = ''
+
+    isEditing.value = false
+    formRef.value?.clearValidate()
+  } catch (error) {
+    // 用戶點擊取消，繼續編輯
+    console.log('繼續編輯')
   }
 }
 
@@ -313,47 +506,49 @@ onMounted(() => {
   fetchUserInfo()
 })
 
-// 部門映射
+// 如果有使用到部門和職位映射的功能也需要导出
 const departmentMap = {
   'BD': '業務部',
   'FD': '消金部',
   'LD': '借貸部'
 }
 
-// 職位映射
 const positionMap = {
   'M': '經理',
   'S': '主管',
   'C': '科員'
 }
 
-// 獲取部門名稱
 const getDepartmentName = (code) => {
   return departmentMap[code] || code
 }
 
-// 獲取職位名稱
 const getPositionName = (code) => {
   return positionMap[code] || code
 }
 
-// 格式化日期
-const formatDate = (date) => {
+const formatDate = (date, includeTime = true) => {
   if (!date) return ''
-  return new Date(date).toLocaleDateString('zh-TW', {
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ''
+
+  const options = {
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+    day: '2-digit'
+  }
+
+  if (includeTime) {
+    options.hour = '2-digit'
+    options.minute = '2-digit'
+  }
+
+  return d.toLocaleDateString('zh-TW', options)
 }
 </script>
 
 <style scoped>
-/* ================================
-   頁面容器與佈局
-================================ */
+/* 頁面容器與佈局 */
 .profile-container {
   min-height: 100vh;
   background-color: #f5f7fa;
@@ -365,9 +560,7 @@ const formatDate = (date) => {
   margin: 0 auto;
 }
 
-/* ================================
-   頁面標題區域
-================================ */
+/* 頁面標題區域 */
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -409,9 +602,7 @@ const formatDate = (date) => {
   font-size: 1.2em;
 }
 
-/* ================================
-   只讀字段樣式
-================================ */
+/* 只讀字段樣式 */
 .readonly-field {
   :deep(.el-input__wrapper) {
     background-color: #f5f7fa !important;
@@ -442,9 +633,7 @@ const formatDate = (date) => {
   transform: none;
 }
 
-/* ================================
-   網格佈局
-================================ */
+/* 網格佈局 */
 .profile-grid {
   display: grid;
   grid-template-columns: 350px 1fr;
@@ -457,9 +646,11 @@ const formatDate = (date) => {
   gap: 1.5rem;
 }
 
-/* ================================
-   照片卡片
-================================ */
+.grid-full-width {
+  grid-column: 1 / -1;
+}
+
+/* 照片卡片 */
 .photo-card {
   height: fit-content;
 }
@@ -520,9 +711,7 @@ const formatDate = (date) => {
   margin-bottom: 8px;
 }
 
-/* ================================
-   基本資訊樣式
-================================ */
+/* 基本資訊樣式 */
 .basic-info {
   padding: 0 1rem;
 }
@@ -541,40 +730,71 @@ const formatDate = (date) => {
   margin: 0.5rem 0;
 }
 
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.id-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.id-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.id-value {
+  color: #1a1a1a;
+  font-family: monospace;
+  padding: 2px 6px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
 .department-tag {
-  background-color: #E0F7FA; /* 柔和淡藍色 */
-  color: #006064;           /* 深藍色文字，提升高級感 */
-  border: 1px solid #B2EBF2; /* 細邊框，略深於背景 */
-  border-radius: 8px;       /* 圓角設計，讓標籤更柔和 */
-  padding: 5px 10px;        /* 增加內距，讓文字更舒適 */
-  font-size: 14px;          /* 適中的文字大小 */
-  font-weight: 500;         /* 半粗體，增加文字的穩重感 */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 輕微陰影，增加立體感 */
-  display: inline-block;    /* 保持標籤樣式不會拉伸 */
+  background-color: #e0f7fa;
+  color: #006064;
+  border: 1px solid #b2ebf2;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: inline-block;
 }
 
 .position-tag {
-  background-color: #FFEBEE; /* 柔和的淡紅色背景 */
-  color: #D32F2F;           /* 深紅色文字，顯示穩重與高級感 */
-  border: 1px solid #FFCDD2; /* 細紅色邊框，略深於背景 */
-  border-radius: 8px;       /* 圓角設計，保持柔和風格 */
-  padding: 5px 10px;        /* 舒適的內距，讓內容更清晰 */
-  font-size: 14px;          /* 與淡藍風格一致的文字大小 */
-  font-weight: 500;         /* 半粗體，增強專業感 */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 輕微陰影，提升層次感 */
-  display: inline-block;    /* 保持標籤樣式不會拉伸 */
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #ffcdd2;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: inline-block;
 }
 
-
+.button-group {
+  display: flex;
+  gap: 12px;
+}
 
 .user-id {
   color: #666;
   font-size: 0.9rem;
 }
 
-/* ================================
-   詳細資訊卡片
-================================ */
+/* 詳細資訊卡片 */
 .details-card {
   height: fit-content;
 }
@@ -596,9 +816,6 @@ const formatDate = (date) => {
   cursor: help;
 }
 
-/* ================================
-   密碼提示
-================================ */
 .password-notice {
   margin-top: 2rem;
   padding-top: 1rem;
@@ -614,9 +831,7 @@ const formatDate = (date) => {
   line-height: 1.6;
 }
 
-/* ================================
-   響應式設計
-================================ */
+/* 響應式設計 */
 @media (max-width: 1200px) {
   .profile-grid {
     grid-template-columns: 300px 1fr;
@@ -650,11 +865,17 @@ const formatDate = (date) => {
     width: 100%;
     justify-content: center;
   }
+  .section-title {
+    font-size: 1rem;
+    padding-bottom: 0.5rem;
+  }
+  .emergency-contact-section {
+    margin-top: 1.5rem;
+    padding-top: 0.5rem;
+  }
 }
 
-/* ================================
-   Element Plus 自定義樣式
-================================ */
+/* Element Plus 自定義樣式 */
 :deep(.el-card) {
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -683,5 +904,23 @@ const formatDate = (date) => {
 
 :deep(.el-alert) {
   border-radius: 8px;
+}
+
+.form-section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  color: #606266;
+  margin: 0 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #eee;
+}
+
+.emergency-contact-section {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
 }
 </style>

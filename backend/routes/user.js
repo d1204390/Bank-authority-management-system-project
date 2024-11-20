@@ -392,7 +392,7 @@ router.post('/toggle-lock', async (req, res) => {
     }
 });
 
-// 獲取用戶個人資料
+// 在獲取個人資料的路由中添加新欄位
 router.get('/profile', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -409,13 +409,22 @@ router.get('/profile', async (req, res) => {
 
         res.json({
             name: user.name,
+            employeeId: user.employeeId,
             account: user.account,
             department: user.department,
             position: user.position,
             email: user.email,
             extension: user.extension || '',
             createdAt: user.createdAt,
-            avatar: user.avatar
+            avatar: user.avatar,
+            // 新增欄位
+            birthday: user.birthday,
+            personalPhone: user.personalPhone || '',
+            emergencyContact: {
+                name: user.emergencyContact?.name || '',
+                phone: user.emergencyContact?.phone || '',
+                relationship: user.emergencyContact?.relationship || ''
+            }
         });
 
     } catch (error) {
@@ -424,8 +433,7 @@ router.get('/profile', async (req, res) => {
     }
 });
 
-
-// 更新用戶個人資料
+// 更新個人資料的路由也需要處理新欄位
 router.put('/profile', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -434,12 +442,30 @@ router.put('/profile', async (req, res) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const { name, email, extension } = req.body;
+        const {
+            name,
+            email,
+            extension,
+            birthday,
+            personalPhone,
+            emergencyContact
+        } = req.body;
 
         // 驗證 Email 格式
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             return res.status(400).json({ msg: '無效的電子郵件格式' });
+        }
+
+        // 驗證手機號碼格式（如果有提供）
+        if (personalPhone && !/^09\d{8}$/.test(personalPhone)) {
+            return res.status(400).json({ msg: '無效的手機號碼格式' });
+        }
+
+        // 驗證緊急聯絡電話格式（如果有提供）
+        if (emergencyContact?.phone &&
+            !(/^09\d{8}$/.test(emergencyContact.phone) || /^0[2-8]\d{7,8}$/.test(emergencyContact.phone))) {
+            return res.status(400).json({ msg: '無效的緊急聯絡電話格式' });
         }
 
         // 更新用戶資料
@@ -448,7 +474,10 @@ router.put('/profile', async (req, res) => {
             {
                 name,
                 email,
-                extension
+                extension,
+                birthday,
+                personalPhone,
+                emergencyContact
             },
             { new: true }
         );
@@ -462,7 +491,10 @@ router.put('/profile', async (req, res) => {
             user: {
                 name: updatedUser.name,
                 email: updatedUser.email,
-                extension: updatedUser.extension
+                extension: updatedUser.extension,
+                birthday: updatedUser.birthday,
+                personalPhone: updatedUser.personalPhone,
+                emergencyContact: updatedUser.emergencyContact
             }
         });
 

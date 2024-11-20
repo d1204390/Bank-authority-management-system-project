@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
         unique: true,
         validate: {
             validator: function(v) {
-                return /^\d{9}$/.test(v);  // 格式為 YYYYMM + 3位數字
+                return /^\d{9}$/.test(v);
             },
             message: '員工編號格式不正確'
         }
@@ -82,17 +82,48 @@ const userSchema = new mongoose.Schema({
     avatar: {
         type: String,
         default: null
+    },
+    // 新增欄位
+    birthday: {
+        type: Date,
+        default: null
+    },
+    personalPhone: {
+        type: String,
+        validate: {
+            validator: function(v) {
+                return !v || /^09\d{8}$/.test(v);
+            },
+            message: '個人電話必須是有效的台灣手機號碼格式'
+        }
+    },
+    emergencyContact: {
+        name: {
+            type: String,
+            default: ''
+        },
+        phone: {
+            type: String,
+            validate: {
+                validator: function(v) {
+                    return !v || /^09\d{8}$/.test(v) || /^0[2-8]\d{7,8}$/.test(v);
+                },
+                message: '緊急聯絡電話必須是有效的台灣電話號碼格式'
+            }
+        },
+        relationship: {
+            type: String,
+            default: ''
+        }
     }
 }, {
     timestamps: true
 });
 
-// 添加靜態方法來生成新的員工編號
+// 保持原有的方法和中間件...
 userSchema.statics.generateEmployeeId = async function() {
     const currentDate = new Date();
     const yearMonth = `${currentDate.getFullYear()}${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-
-    // 查找當前月份最大的員工編號
     const lastEmployee = await this.findOne({
         employeeId: new RegExp(`^${yearMonth}`)
     }).sort({ employeeId: -1 });
@@ -106,7 +137,6 @@ userSchema.statics.generateEmployeeId = async function() {
     return `${yearMonth}${newSequence}`;
 };
 
-// 中間件保持不變
 userSchema.pre('save', function(next) {
     if (this.isModified('department')) {
         this.department = departmentMap[this.department] || this.department;
