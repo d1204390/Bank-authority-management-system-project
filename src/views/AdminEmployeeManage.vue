@@ -546,25 +546,56 @@ const generateRandomPassword = () => {
 // 生成預設帳號
 const generateDefaultAccount = () => {
   if (!form.department || !form.position) {
-    form.username = ''
-    form.password = ''
-    return
+    form.username = '';
+    form.password = '';
+    return;
   }
 
-  const prefix = prefixMap[form.department]?.[form.position]
+  const prefix = prefixMap[form.department]?.[form.position];
   if (!prefix) {
-    form.username = ''
-    form.password = ''
-    return
+    form.username = '';
+    form.password = '';
+    return;
   }
 
-  const existingEmployees = employeeData.value.filter(employee =>
-      employee.username?.startsWith(prefix)
-  )
-  const newNumber = String(existingEmployees.length + 1).padStart(3, '0')
-  form.username = `${prefix}${newNumber}`
-  form.password = generateRandomPassword()
-}
+  try {
+    // 篩選出所有相同前綴的帳號
+    const existingAccounts = employeeData.value
+        .filter(employee => employee.username?.startsWith(prefix))
+        .map(employee => {
+          const numStr = employee.username.slice(prefix.length);
+          const num = parseInt(numStr, 10);
+          return isNaN(num) ? 0 : num;
+        })
+        .sort((a, b) => b - a);
+
+    // 找出最大的編號並加1
+    const maxNumber = existingAccounts.length > 0 ? existingAccounts[0] : 0;
+    const newNumber = String(maxNumber + 1).padStart(3, '0');
+
+    form.username = `${prefix}${newNumber}`;
+    form.password = generateRandomPassword();
+
+    // 驗證生成的帳號是否已存在
+    const isDuplicate = employeeData.value.some(
+        employee => employee.username === form.username
+    );
+
+    if (isDuplicate) {
+      console.error('Generated duplicate account:', form.username);
+      ElMessage.error('帳號生成錯誤，請聯繫系統管理員');
+      return;
+    }
+
+    console.log('Generated new account:', form.username);
+
+  } catch (error) {
+    console.error('Generate account error:', error);
+    ElMessage.error('帳號生成失敗，請重試');
+    form.username = '';
+    form.password = '';
+  }
+};
 
 // 開啟新增對話框
 const openAddEmployeeDialog = () => {
