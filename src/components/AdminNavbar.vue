@@ -17,9 +17,6 @@
         <router-link to="/admin/user" class="nav-link">
           <el-icon><User /></el-icon>使用者管理
         </router-link>
-        <router-link to="/admin/system" class="nav-link">
-          <el-icon><Setting /></el-icon>系統設定
-        </router-link>
         <router-link to="/admin/log" class="nav-link">
           <el-icon><DocumentCopy /></el-icon>操作日誌
         </router-link>
@@ -52,7 +49,6 @@ import { ElMessage } from 'element-plus'
 import {
   Fold,
   User,
-  Setting,
   DocumentCopy,
   ArrowDown,
   UserFilled,
@@ -74,7 +70,6 @@ const logout = () => {
 </script>
 
 <style scoped>
-/* 保留原有的樣式，並添加一些調整 */
 .navbar {
   background-color: #ffffff;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -131,15 +126,13 @@ const logout = () => {
   margin-right: 4px;
 }
 
-/* 漢堡選單按鈕預設隱藏 */
 .nav-toggle {
-  display: none;  /* 預設隱藏 */
+  display: none;
   cursor: pointer;
   font-size: 1.5rem;
   color: #333;
 }
 
-/* 響應式設計 */
 @media (max-width: 768px) {
   .nav-container {
     padding: 0 1rem;
@@ -149,9 +142,8 @@ const logout = () => {
     font-size: 1rem;
   }
 
-  /* 在手機版才顯示漢堡選單按鈕 */
   .nav-toggle {
-    display: block;  /* 在手機版顯示 */
+    display: block;
   }
 
   .nav-items {
@@ -180,7 +172,6 @@ const logout = () => {
   }
 }
 
-/* Element Plus 相關樣式調整 */
 :deep(.el-dropdown-menu__item) {
   display: flex;
   align-items: center;

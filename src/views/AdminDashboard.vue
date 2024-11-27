@@ -8,11 +8,6 @@
         <button @click="handleUserManagement">進入</button>
       </div>
       <div class="option-box">
-        <h3>系統設置</h3>
-        <p>修改系統設定和偏好。</p>
-        <button @click="handleSystemSettings">進入</button>
-      </div>
-      <div class="option-box">
         <h3>日誌查看</h3>
         <p>檢視系統日誌記錄。</p>
         <button @click="handleLogView">進入</button>
@@ -28,10 +23,6 @@ const router = useRouter();
 
 const handleUserManagement = () => {
   router.push('/admin/EmployeesManagementPage');
-};
-
-const handleSystemSettings = () => {
-  router.push('/admin/settings');  // 如果需要添加這個路由
 };
 
 const handleLogView = () => {
