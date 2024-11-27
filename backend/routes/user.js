@@ -4,8 +4,17 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const User = require('../models/User');
 const LoginAttempt = require('../models/LoginAttempt');
+const LoginHistory = require('../models/LoginHistory');
 const { sendLockAccountEmail, sendAccountCredentials } = require('../utils/emailService');
 const mongoose = require('mongoose');
+const recordLoginHistory = async (data) => {
+    try {
+        await LoginHistory.create(data);
+    } catch (error) {
+        console.error('記錄登入歷史失敗:', error);
+        // 僅記錄錯誤但不中斷登入流程
+    }
+};
 
 // 常數定義
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -163,10 +172,21 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { account, password } = req.body;
     const formattedIP = getFormattedIP(req);
+    const userAgent = req.headers['user-agent'] || 'Unknown';  // 添加這行
 
     try {
         const user = await User.findOne({ account });
         if (!user) {
+            // 記錄不存在帳號的登入嘗試
+            await recordLoginHistory({
+                userId: null,
+                account: account,  // 使用請求中提供的帳號
+                employeeId: 'N/A',
+                ipAddress: formattedIP,
+                userAgent,
+                status: 'failed',
+                failureReason: '帳號不存在'
+            });
             return res.status(400).json({ msg: '帳號不存在' });
         }
 
@@ -186,18 +206,52 @@ router.post('/login', async (req, res) => {
         // 檢查帳號是否被鎖定
         const lockStatus = await checkAndUpdateLoginAttempt(loginAttempt);
         if (lockStatus.isLocked) {
+            // 記錄被鎖定帳號的登入嘗試
+            await recordLoginHistory({
+                userId: user._id,
+                account: user.account,
+                employeeId: user.employeeId,
+                ipAddress: formattedIP,
+                userAgent,
+                status: 'failed',
+                failureReason: '帳號已被鎖定'
+            });
             return res.status(403).json({
                 msg: `帳號已被鎖定，請聯絡系統管理員`,
                 lockUntil: lockStatus.lockUntil
             });
         }
 
-        // 驗證密碼
+// 驗證密碼
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             const failureResult = await handleLoginFailure(loginAttempt, user, formattedIP);
+
+            // 記錄失敗的登入
+            await recordLoginHistory({
+                userId: user._id,
+                account: user.account,
+                employeeId: user.employeeId,
+                ipAddress: formattedIP,
+                userAgent,
+                status: 'failed',
+                failureReason: '密碼錯誤'
+            });
+
             return res.status(failureResult.status).json(failureResult.response);
         }
+
+        // 登入成功，記錄登入歷史
+        await recordLoginHistory({
+            userId: user._id,
+            account: user.account,
+            employeeId: user.employeeId,
+            ipAddress: formattedIP,
+            userAgent,
+            status: 'success'
+        });
+
+
 
         // 登入成功，重置登入嘗試記錄
         loginAttempt.attempts = 0;
@@ -683,5 +737,7 @@ router.get('/check-status', async (req, res) => {
         res.status(500).json({ msg: '伺服器錯誤' });
     }
 });
+
+
 
 module.exports = router;

@@ -195,6 +195,7 @@ const handleErrorResponse = (status, data, isAdmin) => {
 };
 
 // 登入處理函數
+// 登入處理函數
 const handleLogin = async () => {
   if (!username.value || !password.value) {
     ElMessage.warning('請輸入帳號和密碼')
@@ -216,12 +217,17 @@ const handleLogin = async () => {
         {
           account: username.value,
           password: password.value,
-          isAdminMode: isAdmin
+          isAdminMode: isAdmin,
+          // 新增用戶代理資訊
+          userAgent: navigator.userAgent
         },
         {
           headers: {
             'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            // 可以新增其他需要的 header
+            'X-Client-Platform': navigator.platform,
+            'X-Client-Browser': navigator.vendor
           }
         }
     )
@@ -243,13 +249,12 @@ const handleLogin = async () => {
           throw new Error('Invalid admin token')
         }
 
-
         // 檢查是否為首次登入
         if (!isAdmin && response.data.user.isFirstLogin) {
           showPasswordDialog.value = true
           currentToken.value = response.data.token
           currentAccount.value = username.value
-          return // 停止後續執行
+          return
         }
 
         // 顯示成功消息

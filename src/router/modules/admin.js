@@ -1,6 +1,7 @@
 import AdminDashboard from '@/views/AdminDashboard.vue'
 import AdminEmployeeManage from '@/views/AdminEmployeeManage.vue'
 import AdminLogin from '@/views/AdminLogin.vue'
+import LoginHistory from '@/views/LoginHistory.vue'
 
 export default [
     {
@@ -19,6 +20,12 @@ export default [
         path: '/admin/EmployeesManagementPage',
         name: 'EmployeesManagement',
         component: AdminEmployeeManage,
+        meta: { requiresAuth: true, role: 'admin' }
+    },
+    {
+        path: '/admin/login-history',
+        name: 'LoginHistory',
+        component: LoginHistory,
         meta: { requiresAuth: true, role: 'admin' }
     }
 ]

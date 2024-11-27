@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const LoginAttempt = require('../models/LoginAttempt');
 const { sendLockAccountEmail } = require('../utils/emailService');
+const LoginHistory = require('../models/LoginHistory');
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_TIME = 15 * 60 * 1000;
@@ -151,6 +152,98 @@ router.post('/login', async (req, res) => {
 
     } catch (error) {
         console.error('伺服器錯誤:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+// 獲取登入記錄列表
+router.get('/login-history', async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 10,
+            startDate,
+            endDate,
+            account,
+            status
+        } = req.query;
+
+        const query = {};
+
+        // 添加日期範圍篩選
+        if (startDate || endDate) {
+            query.loginTime = {};
+            if (startDate) query.loginTime.$gte = new Date(startDate);
+            if (endDate) query.loginTime.$lte = new Date(endDate);
+        }
+
+        // 添加帳號篩選
+        if (account) {
+            query.account = new RegExp(account, 'i');
+        }
+
+        // 添加狀態篩選
+        if (status) {
+            query.status = status;
+        }
+
+        const total = await LoginHistory.countDocuments(query);
+        const loginHistory = await LoginHistory.find(query)
+            .sort({ loginTime: -1 })
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit))
+            .populate('userId', 'name department position');
+
+        res.json({
+            loginHistory,
+            pagination: {
+                total,
+                page: parseInt(page),
+                pages: Math.ceil(total / limit)
+            }
+        });
+
+    } catch (error) {
+        console.error('獲取登入記錄失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+// 獲取登入統計數據
+router.get('/login-statistics', async (req, res) => {
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const [todaySuccess, todayFailed, totalSuccess, totalFailed] = await Promise.all([
+            // 今日成功登入
+            LoginHistory.countDocuments({
+                loginTime: { $gte: today },
+                status: 'success'
+            }),
+            // 今日失敗嘗試
+            LoginHistory.countDocuments({
+                loginTime: { $gte: today },
+                status: 'failed'
+            }),
+            // 總成功登入
+            LoginHistory.countDocuments({
+                status: 'success'
+            }),
+            // 總失敗次數
+            LoginHistory.countDocuments({
+                status: 'failed'
+            })
+        ]);
+
+        res.json({
+            todaySuccess,
+            todayFailed,
+            totalSuccess,
+            totalFailed
+        });
+    } catch (error) {
+        console.error('獲取登入統計失敗:', error);
         res.status(500).json({ msg: '伺服器錯誤' });
     }
 });

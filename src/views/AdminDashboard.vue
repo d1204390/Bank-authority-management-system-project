@@ -3,9 +3,14 @@
     <h1>系統管理員後台</h1>
     <div class="admin-options">
       <div class="option-box">
-        <h3>用戶管理</h3>
-        <p>檢視和管理系統用戶。</p>
+        <h3>使用者管理</h3>
+        <p>檢視和管理系統使用者。</p>
         <button @click="handleUserManagement">進入</button>
+      </div>
+      <div class="option-box">
+        <h3>使用者登入記錄</h3>
+        <p>查看系統登入歷史記錄。</p>
+        <button @click="handleLoginHistory">進入</button>
       </div>
       <div class="option-box">
         <h3>日誌查看</h3>
@@ -23,6 +28,10 @@ const router = useRouter();
 
 const handleUserManagement = () => {
   router.push('/admin/EmployeesManagementPage');
+};
+
+const handleLoginHistory = () => {
+  router.push('/admin/login-history');
 };
 
 const handleLogView = () => {
