@@ -3,6 +3,20 @@
     <div class="content-wrapper">
       <h1 class="page-title">員工管理</h1>
 
+      <!-- 員工統計資訊 -->
+      <div class="statistics-bar">
+        <el-card class="stat-card" shadow="never">
+          <div class="stat-content">
+            <div class="stat-label">
+              <el-icon><User /></el-icon>
+              <span>人數</span>
+            </div>
+            {{ filteredEmployeeData.length }}
+          </div>
+        </el-card>
+      </div>
+
+
       <!-- 功能按鈕 -->
       <div class="tool-bar">
         <el-button type="info" @click="resetFilters">
@@ -284,16 +298,25 @@
       </el-dialog>
     </div>
   </div>
+  <!-- 查看詳情對話框 -->
+  <ViewEmployeeDialog
+      v-model:visible="viewDialogVisible"
+      :user-data="currentViewUser"
+      @edit="handleEdit"
+  />
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import {
   Plus, Edit, View, Delete, Search, Refresh,
-  Lock, Unlock, CircleCheck, CircleClose
+  Lock, Unlock, CircleCheck, CircleClose,
+  User,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
+import ViewEmployeeDialog from '@/components/ViewEmployeeDialog.vue'
+import { ElLoading } from 'element-plus'
 
 // ref 宣告
 const searchQuery = ref('')
@@ -313,6 +336,10 @@ const employeeIdQuery = ref('') // 新增員工編號搜尋
 const progressVisible = ref(false)
 const activeStep = ref(0)
 const progressMessage = ref('')
+
+// 查看對話框相關的 ref
+const viewDialogVisible = ref(false)
+const currentViewUser = ref(null)
 
 // 部門代碼映射
 const departmentMap = {
@@ -477,6 +504,8 @@ const fetchEmployees = async () => {
       extension: user.extension,
       username: user.account,
       email: user.email,
+      avatar: user.avatar,  // 添加這行來獲取頭像
+      createdAt: user.createdAt,  // 建立時間
       raw_department: user.department,
       raw_position: user.position,
       isLocked: lockStatusMap.get(user.account)?.status === 'locked',
@@ -643,9 +672,66 @@ const handleEdit = (row) => {
 }
 
 // 查看處理
-const handleView = () => {
-  ElMessage.info('查看功能開發中')
+const handleView = async (row) => {
+  try {
+    // 顯示載入中
+    const loading = ElLoading.service({
+      lock: true,
+      text: '載入中...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+
+    // 獲取完整的用戶詳情
+    const response = await axios.get(`/api/user/employee/${row.username}/details`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+
+    // 合併表格數據和詳細數據
+    currentViewUser.value = {
+      ...row,
+      ...response.data,
+      // 保持原有的格式化後的部門和職位顯示
+      department: convertDepartment(response.data.department),
+      position: convertPosition(response.data.position),
+      // 保存原始的部門和職位代碼
+      raw_department: response.data.department,
+      raw_position: response.data.position,
+      // 確保帳號狀態正確顯示
+      isLocked: response.data.isLocked || row.isLocked,
+      isActive: response.data.isActive || row.isActive,
+      // 格式化時間相關資訊
+      createdAt: response.data.createdAt,
+      lastLoginTime: response.data.lastLoginTime,
+      // 個人資訊
+      birthday: response.data.birthday,
+      personalPhone: response.data.personalPhone,
+      // 緊急聯絡人資訊
+      emergencyContact: {
+        name: response.data.emergencyContact?.name || '',
+        phone: response.data.emergencyContact?.phone || '',
+        relationship: response.data.emergencyContact?.relationship || ''
+      }
+    }
+
+    // 關閉載入中
+    loading.close()
+
+    // 打開詳情對話框
+    viewDialogVisible.value = true
+
+  } catch (error) {
+    // 錯誤處理
+    console.error('獲取用戶詳情失敗:', error)
+    ElMessage.error(error.response?.data?.msg || '獲取用戶詳情失敗')
+
+    // 如果發生錯誤，仍然顯示基本資訊
+    currentViewUser.value = row
+    viewDialogVisible.value = true
+  }
 }
+
 
 // 刪除處理
 const handleDelete = async (row) => {
@@ -1008,5 +1094,40 @@ onMounted(() => {
   .progress-container {
     padding: 10px;
   }
+}
+
+.statistics-bar {
+  display: flex;
+  justify-content: center;
+  margin: -15px auto 20px;
+  width: fit-content; /* 改為自適應寬度 */
+}
+
+.stat-card {
+  background-color: #f5f7fa;
+  border: none;
+  width: auto; /* 改為自適應寬度 */
+}
+
+:deep(.el-card__body) {
+  padding: 6px 12px; /* 減少內邊距 */
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 更小的間距 */
+  color: #409EFF;
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap; /* 防止換行 */
+}
+
+.stat-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #909399;
+  font-size: 13px;
 }
 </style>

@@ -40,6 +40,13 @@
       </div>
     </div>
   </div>
+  <ChangePasswordDialog
+      v-model:visible="showPasswordDialog"
+      :account="currentAccount"
+      :token="currentToken"
+      @password-changed="handlePasswordChanged"
+      @update-token="handleTokenUpdate"
+  />
 </template>
 
 <script setup>
@@ -48,6 +55,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { getTokenInfo } from '@/router/guards'
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 
 const router = useRouter()
 
@@ -59,6 +67,9 @@ const clickCount = ref(0)
 const isAdminMode = ref(false)
 const clickTimer = ref(null)
 const isLoading = ref(false)
+const showPasswordDialog = ref(false)
+const currentToken = ref('')
+const currentAccount = ref('')
 
 // 路由處理函數
 const handleRouting = async (tokenData) => {
@@ -232,6 +243,15 @@ const handleLogin = async () => {
           throw new Error('Invalid admin token')
         }
 
+
+        // 檢查是否為首次登入
+        if (!isAdmin && response.data.user.isFirstLogin) {
+          showPasswordDialog.value = true
+          currentToken.value = response.data.token
+          currentAccount.value = username.value
+          return // 停止後續執行
+        }
+
         // 顯示成功消息
         ElMessage({
           message: `${isAdmin ? '管理員' : '使用者'}登入成功`,
@@ -267,6 +287,50 @@ const handleLogin = async () => {
       isLoading.value = false
     }, 300)
   }
+}
+
+// 在 script setup 中添加
+const handlePasswordChanged = async (newToken) => {
+  try {
+    // 先保存新的 token
+    localStorage.setItem('token', newToken)
+    currentToken.value = newToken
+
+    // 再解析 token 資訊
+    const tokenInfo = getTokenInfo(newToken)
+    if (!tokenInfo) {
+      throw new Error('Invalid token after password change')
+    }
+
+    // 關閉對話框
+    showPasswordDialog.value = false
+
+    // 顯示成功訊息
+    ElMessage({
+      message: '密碼更改成功，即將進入系統',
+      type: 'success',
+      duration: 2000
+    })
+
+    // 等待訊息顯示後再跳轉
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    // 最後執行路由跳轉
+    await handleRouting(tokenInfo)
+  } catch (error) {
+    console.error('Password change handling error:', error)
+    ElMessage.error('處理密碼更改時發生錯誤')
+
+    // 發生錯誤時清除狀態
+    localStorage.removeItem('token')
+    sessionStorage.removeItem('userInfo')
+    currentToken.value = ''
+  }
+}
+
+const handleTokenUpdate = (newToken) => {
+  localStorage.setItem('token', newToken)
+  currentToken.value = newToken
 }
 
 // 組件掛載時進行檢查

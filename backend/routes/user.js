@@ -230,6 +230,10 @@ router.post('/login', async (req, res) => {
             return res.status(500).json({ msg: '職位格式錯誤' });
         }
 
+        // 更新最後登入時間
+        user.lastLoginTime = new Date();
+        await user.save();
+
         // 生成 token 並返回
         const token = generateToken(user, department, position);
 
@@ -242,7 +246,9 @@ router.post('/login', async (req, res) => {
                 account: user.account,
                 department,
                 position,
-                role: 'user'
+                role: 'user',
+                lastLoginTime: user.lastLoginTime,
+                isFirstLogin: user.isFirstLogin
             }
         });
 
@@ -424,7 +430,8 @@ router.get('/profile', async (req, res) => {
                 name: user.emergencyContact?.name || '',
                 phone: user.emergencyContact?.phone || '',
                 relationship: user.emergencyContact?.relationship || ''
-            }
+            },
+            lastLoginTime: user.lastLoginTime, // 確保包含最後登入時間
         });
 
     } catch (error) {
@@ -567,6 +574,113 @@ router.post('/upload-avatar', async (req, res) => {
             msg: '上傳失敗',
             error: error.message
         });
+    }
+});
+
+// 在 user.js 路由中添加這個新的端點，能查看特定用戶詳情的端點
+router.get('/employee/:account/details', async (req, res) => {
+    try {
+        const user = await User.findOne({ account: req.params.account });
+
+        if (!user) {
+            return res.status(404).json({ msg: '找不到用戶資料' });
+        }
+
+        // 獲取用戶的登入嘗試記錄以確認鎖定狀態
+        const loginAttempt = await LoginAttempt.findOne({
+            account: user.account,
+            role: 'user'
+        });
+
+        res.json({
+            id: user._id,
+            employeeId: user.employeeId,
+            name: user.name,
+            account: user.account,
+            department: user.department,
+            position: user.position,
+            email: user.email,
+            extension: user.extension || '',
+            avatar: user.avatar,
+            createdAt: user.createdAt,
+            // 檢查 lastLoginTime 是否存在，不存在則返回 null
+            lastLoginTime: user.lastLoginTime || null,
+            // 如果 lastLoginTime 不存在，就假定是未登入過
+            isFirstLogin: user.isFirstLogin ?? (!user.lastLoginTime),
+            isLocked: loginAttempt?.status === 'locked',
+            birthday: user.birthday,
+            personalPhone: user.personalPhone || '',
+            emergencyContact: {
+                name: user.emergencyContact?.name || '',
+                phone: user.emergencyContact?.phone || '',
+                relationship: user.emergencyContact?.relationship || ''
+            }
+        });
+
+    } catch (error) {
+        console.error('獲取用戶詳情失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+// 添加更改密碼的路由
+router.post('/change-password', async (req, res) => {
+    try {
+        const { account, oldPassword, newPassword } = req.body;
+        const user = await User.findOne({ account });
+
+        if (!user) {
+            return res.status(404).json({ msg: '使用者不存在' });
+        }
+
+        // 驗證舊密碼
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ msg: '原始密碼錯誤' });
+        }
+
+        // 更新密碼
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        user.isFirstLogin = false;  // 更改密碼後將首次登入標記設為 false
+        await user.save();
+
+        // 生成新的 token
+        const token = generateToken(user, user.department, user.position);
+
+        res.json({
+            msg: '密碼更改成功',
+            token
+        });
+
+    } catch (error) {
+        console.error('更改密碼失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+// 檢查用戶狀態的路由
+router.get('/check-status', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ msg: '未提供認證令牌' });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findOne({ account: decoded.account });
+
+        if (!user) {
+            return res.status(404).json({ msg: '找不到用戶資料' });
+        }
+
+        res.json({
+            isFirstLogin: user.isFirstLogin
+        });
+
+    } catch (error) {
+        console.error('檢查狀態失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
     }
 });
 

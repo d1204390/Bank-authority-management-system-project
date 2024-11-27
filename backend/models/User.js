@@ -97,6 +97,14 @@ const userSchema = new mongoose.Schema({
             message: '個人電話必須是有效的台灣手機號碼格式'
         }
     },
+    isFirstLogin: {
+        type: Boolean,
+        default: true  // 預設為 true，表示首次登入
+    },
+    lastLoginTime: {  // 新增最後登入時間欄位
+        type: Date,
+        default: null
+    },
     emergencyContact: {
         name: {
             type: String,
