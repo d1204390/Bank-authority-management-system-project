@@ -19,6 +19,9 @@
 
       <!-- 功能按鈕 -->
       <div class="tool-bar">
+        <el-button type="success" @click="refreshTable">
+          <el-icon><Refresh /></el-icon>重新整理
+        </el-button>
         <el-button type="info" @click="resetFilters">
           <el-icon><Refresh /></el-icon>重置篩選
         </el-button>
@@ -821,6 +824,25 @@ const handleSubmit = async () => {
   }
 }
 
+// 刷新表格數據方法
+const refreshTable = async () => {
+  try {
+    const loading = ElLoading.service({
+      lock: true,
+      text: '更新資料中...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+
+    await fetchEmployees()
+    ElMessage.success('資料已更新')
+
+    loading.close()
+  } catch (error) {
+    console.error('更新資料失敗:', error)
+    ElMessage.error('更新資料失敗，請重試')
+  }
+}
+
 // 重置篩選
 const resetFilters = () => {
   employeeIdQuery.value = ''
@@ -866,6 +888,7 @@ onMounted(() => {
   margin-bottom: 20px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px; /* 添加按鈕間距 */
 }
 
 .filter-section {

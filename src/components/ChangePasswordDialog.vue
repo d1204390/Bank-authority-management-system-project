@@ -6,7 +6,7 @@
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       :show-close="false"
-      width="460px"
+      width="520px"
       class="password-change-dialog"
       :top="'5vh'"
   >
@@ -14,7 +14,10 @@
       <div class="form-header">
         <el-icon class="lock-icon"><Lock /></el-icon>
         <h2>請設定新密碼</h2>
-        <p class="subtitle">為了確保您的帳戶安全，請更改您的密碼</p>
+        <p class="warning-message">
+          <el-icon><Warning /></el-icon>
+          密碼僅限初次登入時可以修改，日後欲修改請聯絡系統管理員。
+        </p>
       </div>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
@@ -88,7 +91,7 @@
 import { ref, reactive, defineProps, defineEmits, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { Lock, Key, LockClosed, CheckCircle, Check, InfoFilled } from '@element-plus/icons-vue'
+import { Lock, Key, LockClosed, CheckCircle, Check, InfoFilled, Warning } from '@element-plus/icons-vue'
 
 const props = defineProps({
   visible: {
@@ -229,6 +232,23 @@ const handleSubmit = async () => {
   margin: 0;
   color: var(--el-text-color-secondary);
   font-size: 14px;
+}
+
+.warning-message {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  background-color: #fef0f0;
+  border: 1px solid #fde2e2;
+  border-radius: 4px;
+  color: #f56c6c;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warning-message .el-icon {
+  font-size: 16px;
 }
 
 .password-rules {
