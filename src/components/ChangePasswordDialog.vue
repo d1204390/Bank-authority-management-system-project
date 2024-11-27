@@ -37,7 +37,7 @@
               type="password"
               placeholder="請輸入新密碼"
               show-password
-              :prefix-icon="LockClosed"
+              :prefix-icon="Lock"
           />
         </el-form-item>
 
@@ -47,7 +47,7 @@
               type="password"
               placeholder="請再次輸入新密碼"
               show-password
-              :prefix-icon="CheckCircle"
+              :prefix-icon="CircleCheck"
           />
         </el-form-item>
       </el-form>
@@ -91,7 +91,7 @@
 import { ref, reactive, defineProps, defineEmits, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { Lock, Key, LockClosed, CheckCircle, Check, InfoFilled, Warning } from '@element-plus/icons-vue'
+import { Lock, Key, CircleCheck, Check, InfoFilled, Warning } from '@element-plus/icons-vue'
 
 const props = defineProps({
   visible: {
