@@ -16,7 +16,6 @@
         </el-card>
       </div>
 
-
       <!-- 功能按鈕 -->
       <div class="tool-bar">
         <el-button type="success" @click="refreshTable">
@@ -77,7 +76,7 @@
       <!-- 表格卡片 -->
       <el-card class="table-card">
         <el-table
-            :data="filteredEmployeeData"
+            :data="paginatedData"
             style="width: 100%"
             :border="true"
             :stripe="true"
@@ -135,6 +134,7 @@
               align="center"
           />
 
+          <!-- 帳號狀態 -->
           <el-table-column
               label="帳號狀態"
               min-width="200"
@@ -167,11 +167,12 @@
                     :activeValue="true"
                     :inactiveValue="false"
                 />
+
                 <!-- 狀態提示 -->
                 <el-tooltip
                     :content="row.isLocked ?
-            `帳號已鎖定至 ${formatLockTime(row.lockUntil)}` :
-            '帳號使用正常'"
+                    `帳號已鎖定至 ${formatLockTime(row.lockUntil)}` :
+                    '帳號使用正常'"
                     placement="top"
                     effect="dark"
                     :show-after="500"
@@ -186,6 +187,7 @@
               </div>
             </template>
           </el-table-column>
+
           <!-- 操作 -->
           <el-table-column
               label="操作"
@@ -223,10 +225,32 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 分頁組件 -->
+        <div class="pagination-container">
+          <el-pagination
+              v-model:currentPage="currentPage"
+              v-model:pageSize="pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="filteredEmployeeData.length"
+              layout="sizes, prev, pager, next, jumper"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+              :page-size-opts="[
+      { value: 10, label: '10筆/頁' },
+      { value: 20, label: '20筆/頁' },
+      { value: 50, label: '50筆/頁' },
+      { value: 100, label: '100筆/頁' }
+    ]"
+              prev-text="上一頁"
+              next-text="下一頁"
+          />
+        </div>
       </el-card>
 
       <!-- 新增/編輯對話框 -->
       <el-dialog v-model="dialogVisible" :title="isEdit ? '編輯員工' : '新增員工'" width="50%">
+        <!-- 表單內容 -->
         <el-form
             ref="formRef"
             :model="form"
@@ -301,6 +325,7 @@
       </el-dialog>
     </div>
   </div>
+
   <!-- 查看詳情對話框 -->
   <ViewEmployeeDialog
       v-model:visible="viewDialogVisible"
@@ -308,9 +333,8 @@
       @edit="handleEdit"
   />
 </template>
-
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import {
   Plus, Edit, View, Delete, Search, Refresh,
   Lock, Unlock, CircleCheck, CircleClose,
@@ -321,7 +345,7 @@ import axios from 'axios'
 import ViewEmployeeDialog from '@/components/ViewEmployeeDialog.vue'
 import { ElLoading } from 'element-plus'
 
-// ref 宣告
+// === 基礎狀態 ref 宣告 ===
 const searchQuery = ref('')
 const departmentFilter = ref('')
 const positionFilter = ref('')
@@ -331,41 +355,43 @@ const isEdit = ref(false)
 const employeeData = ref([])
 const formRef = ref(null)
 const isSubmitting = ref(false)
-const emailPrefix = ref('') // email 前綴的 ref
+const emailPrefix = ref('')
 const accountStatusFilter = ref('')
-const employeeIdQuery = ref('') // 新增員工編號搜尋
+const employeeIdQuery = ref('')
 
-// 進度相關的 ref
+// === 進度狀態 ref ===
 const progressVisible = ref(false)
 const activeStep = ref(0)
 const progressMessage = ref('')
 
-// 查看對話框相關的 ref
+// === 對話框狀態 ref ===
 const viewDialogVisible = ref(false)
 const currentViewUser = ref(null)
 
-// 部門代碼映射
+// === 分頁相關 ref ===
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+// === 映射表 ===
 const departmentMap = {
   'BD': '業務部',
   'FD': '消金部',
   'LD': '借貸部'
 }
 
-// 職位代碼映射
 const positionMap = {
   'M': '經理',
   'S': '主管',
   'C': '科員'
 }
 
-// 部門職位對應表
 const prefixMap = {
   '業務部': { '經理': 'BDM', '主管': 'BDS', '科員': 'BDC' },
   '消金部': { '經理': 'FDM', '主管': 'FDS', '科員': 'FDC' },
   '借貸部': { '經理': 'LDM', '主管': 'LDS', '科員': 'LDC' }
 }
 
-// 表單驗證規則
+// === 表單驗證規則 ===
 const rules = {
   name: [
     { required: true, message: '請輸入姓名', trigger: 'blur' }
@@ -392,6 +418,7 @@ const rules = {
   ]
 }
 
+// === 表單數據 ===
 const form = reactive({
   name: '',
   department: '',
@@ -402,13 +429,67 @@ const form = reactive({
   email: ''
 })
 
-// 處理 email 輸入
+// === Computed Properties ===
+// 篩選後的員工數據
+const filteredEmployeeData = computed(() => {
+  let result = [...employeeData.value]
+
+  if (employeeIdQuery.value) {
+    result = result.filter(employee =>
+        employee.employeeId?.toString().includes(employeeIdQuery.value)
+    )
+  }
+
+  if (searchQuery.value) {
+    result = result.filter(employee =>
+        employee.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    )
+  }
+
+  if (departmentFilter.value) {
+    result = result.filter(employee =>
+        employee.department === departmentFilter.value
+    )
+  }
+
+  if (positionFilter.value) {
+    result = result.filter(employee =>
+        employee.position === positionFilter.value
+    )
+  }
+
+  if (accountStatusFilter.value) {
+    result = result.filter(employee =>
+        accountStatusFilter.value === 'locked' ? employee.isLocked : !employee.isLocked
+    )
+  }
+
+  if (sortOrder.value) {
+    result.sort((a, b) => {
+      const aId = a.employeeId || ''
+      const bId = b.employeeId || ''
+      return sortOrder.value === 'asc' ? aId.localeCompare(bId) : bId.localeCompare(aId)
+    })
+  }
+
+  return result
+})
+
+// 分頁後的數據
+const paginatedData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredEmployeeData.value.slice(start, end)
+})
+
+// === Methods ===
+// Email 相關
 const handleEmailInput = (value) => {
   emailPrefix.value = value
   form.email = value ? `${value}@gmail.com` : ''
 }
 
-// 格式化鎖定時間
+// 格式化時間
 const formatLockTime = (lockUntil) => {
   if (!lockUntil) return ''
   return new Date(lockUntil).toLocaleString('zh-TW', {
@@ -420,73 +501,117 @@ const formatLockTime = (lockUntil) => {
   })
 }
 
-// 轉換部門代碼為中文
-const convertDepartment = (code) => {
-  return departmentMap[code] || code
+// 轉換代碼
+const convertDepartment = (code) => departmentMap[code] || code
+const convertPosition = (code) => positionMap[code] || code
+
+// 帳號相關
+const generateRandomPassword = () => {
+  const characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  return Array.from({ length: 6 }, () =>
+      characters[Math.floor(Math.random() * characters.length)]
+  ).join('')
 }
 
-// 轉換職位代碼為中文
-const convertPosition = (code) => {
-  return positionMap[code] || code
+const generateDefaultAccount = () => {
+  if (!form.department || !form.position) {
+    form.username = ''
+    form.password = ''
+    return
+  }
+
+  const prefix = prefixMap[form.department]?.[form.position]
+  if (!prefix) {
+    form.username = ''
+    form.password = ''
+    return
+  }
+
+  try {
+    const existingAccounts = employeeData.value
+        .filter(employee => employee.username?.startsWith(prefix))
+        .map(employee => {
+          const numStr = employee.username.slice(prefix.length)
+          const num = parseInt(numStr, 10)
+          return isNaN(num) ? 0 : num
+        })
+        .sort((a, b) => b - a)
+
+    const maxNumber = existingAccounts.length > 0 ? existingAccounts[0] : 0
+    const newNumber = String(maxNumber + 1).padStart(3, '0')
+    form.username = `${prefix}${newNumber}`
+    form.password = generateRandomPassword()
+
+    const isDuplicate = employeeData.value.some(
+        employee => employee.username === form.username
+    )
+
+    if (isDuplicate) {
+      console.error('Generated duplicate account:', form.username)
+      ElMessage.error('帳號生成錯誤，請聯繫系統管理員')
+      return
+    }
+  } catch (error) {
+    console.error('Generate account error:', error)
+    ElMessage.error('帳號生成失敗，請重試')
+    form.username = ''
+    form.password = ''
+  }
 }
 
-// 篩選後的員工數據
-const filteredEmployeeData = computed(() => {
-  let result = [...employeeData.value]
-
-  // 員工編號搜尋
-  if (employeeIdQuery.value) {
-    result = result.filter(employee =>
-        employee.employeeId?.toString().includes(employeeIdQuery.value)
-    )
+// 表單相關
+const resetForm = () => {
+  if (formRef.value) {
+    formRef.value.resetFields()
   }
+  Object.assign(form, {
+    name: '',
+    department: '',
+    position: '',
+    extension: '',
+    username: '',
+    password: '',
+    email: ''
+  })
+  emailPrefix.value = ''
+}
 
-  // 姓名搜尋
-  if (searchQuery.value) {
-    result = result.filter(employee =>
-        employee.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
-  }
+const resetProgress = () => {
+  activeStep.value = 0
+  progressMessage.value = ''
+  progressVisible.value = false
+  isSubmitting.value = false
+}
 
-  // 部門篩選
-  if (departmentFilter.value) {
-    result = result.filter(employee =>
-        employee.department === departmentFilter.value
-    )
-  }
+// 分頁處理
+const handleSizeChange = (val) => {
+  pageSize.value = val
+  currentPage.value = 1
+}
 
-  // 職位篩選
-  if (positionFilter.value) {
-    result = result.filter(employee =>
-        employee.position === positionFilter.value
-    )
-  }
+const handleCurrentChange = (val) => {
+  currentPage.value = val
+}
 
-  // 帳號狀態篩選
-  if (accountStatusFilter.value) {
-    result = result.filter(employee =>
-        accountStatusFilter.value === 'locked' ? employee.isLocked : !employee.isLocked
-    )
-  }
+// 重置篩選
+const resetFilters = () => {
+  employeeIdQuery.value = ''
+  searchQuery.value = ''
+  departmentFilter.value = ''
+  positionFilter.value = ''
+  sortOrder.value = ''
+  accountStatusFilter.value = ''
+  currentPage.value = 1
+  pageSize.value = 10
+}
 
-  // 排序
-  if (sortOrder.value) {
-    result.sort((a, b) => {
-      // 確保存在員工編號，如果不存在則使用空字符串作為預設值
-      const aId = a.employeeId || '';
-      const bId = b.employeeId || '';
-
-      if (sortOrder.value === 'asc') {
-        return aId.localeCompare(bId)
-      }
-      return bId.localeCompare(aId)
-    })
-  }
-
-  return result
+// Watch
+watch([searchQuery, departmentFilter, positionFilter, accountStatusFilter, employeeIdQuery, sortOrder], () => {
+  currentPage.value = 1
 })
 
-// 獲取員工列表方法
+// === CRUD 操作 ===
+// 獲取數據
 const fetchEmployees = async () => {
   try {
     const [usersResponse, lockStatusResponse] = await Promise.all([
@@ -507,8 +632,8 @@ const fetchEmployees = async () => {
       extension: user.extension,
       username: user.account,
       email: user.email,
-      avatar: user.avatar,  // 添加這行來獲取頭像
-      createdAt: user.createdAt,  // 建立時間
+      avatar: user.avatar,
+      createdAt: user.createdAt,
       raw_department: user.department,
       raw_position: user.position,
       isLocked: lockStatusMap.get(user.account)?.status === 'locked',
@@ -522,7 +647,169 @@ const fetchEmployees = async () => {
   }
 }
 
-// 處理帳號狀態變更
+// 新增/編輯
+const handleSubmit = async () => {
+  if (!formRef.value) return
+
+  try {
+    await formRef.value.validate()
+    isSubmitting.value = true
+    progressVisible.value = true
+
+    // 執行步驟
+    progressMessage.value = '正在生成員工編號...'
+    activeStep.value = 1
+    const employeeIdResponse = await axios.get('/api/user/generate-employee-id')
+
+    progressMessage.value = '正在保存用戶資料...'
+    activeStep.value = 2
+    const response = await axios.post('/api/user/register', {
+      employeeId: employeeIdResponse.data.employeeId,
+      name: form.name,
+      department: form.department,
+      position: form.position,
+      account: form.username,
+      password: form.password,
+      email: form.email
+    })
+
+    progressMessage.value = '正在生成帳號...'
+    activeStep.value = 3
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    progressMessage.value = '正在發送郵件通知...'
+    activeStep.value = 4
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    if (response.status === 201) {
+      progressMessage.value = '處理完成！'
+      await fetchEmployees()
+
+      setTimeout(() => {
+        resetProgress()
+        dialogVisible.value = false
+        resetForm()
+        ElMessage.success('新增成功，帳號密碼已發送至使用者信箱')
+      }, 1000)
+    }
+  } catch (error) {
+    resetProgress()
+    if (!error?.message?.includes('validation')) {
+      console.error('新增失敗:', error)
+      ElMessage.error('新增失敗，請重試')
+    }
+  }
+}
+
+// 其他動作處理方法
+const openAddEmployeeDialog = () => {
+  dialogVisible.value = true
+  isEdit.value = false
+  resetForm()
+  generateDefaultAccount()
+}
+
+const handleEdit = (row) => {
+  isEdit.value = true
+  dialogVisible.value = true
+  Object.assign(form, {
+    ...row,
+    department: row.raw_department || row.department,
+    position: row.raw_position || row.position,
+    email: row.email || ''
+  })
+  emailPrefix.value = form.email ? form.email.split('@')[0] : ''
+}
+
+const handleDelete = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+        `確定要刪除 ${row.name} 的資料嗎？`,
+        '警告',
+        {
+          confirmButtonText: '確定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+    )
+
+    await axios.delete('/api/user/employee', {
+      data: { account: row.username }
+    })
+
+    ElMessage.success('刪除成功')
+    await fetchEmployees()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('刪除失敗:', error)
+      ElMessage.error('刪除失敗，請重試')
+    }
+  }
+}
+
+const handleView = async (row) => {
+  try {
+    const loading = ElLoading.service({
+      lock: true,
+      text: '載入中...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+
+    const response = await axios.get(`/api/user/employee/${row.username}/details`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+
+    currentViewUser.value = {
+      ...row,
+      ...response.data,
+      department: convertDepartment(response.data.department),
+      position: convertPosition(response.data.position),
+      raw_department: response.data.department,
+      raw_position: response.data.position,
+      isLocked: response.data.isLocked || row.isLocked,
+      isActive: response.data.isActive || row.isActive,
+      createdAt: response.data.createdAt,
+      lastLoginTime: response.data.lastLoginTime,
+      birthday: response.data.birthday,
+      personalPhone: response.data.personalPhone,
+      emergencyContact: {
+        name: response.data.emergencyContact?.name || '',
+        phone: response.data.emergencyContact?.phone || '',
+        relationship: response.data.emergencyContact?.relationship || ''
+      }
+    }
+
+    loading.close()
+    viewDialogVisible.value = true
+  } catch (error) {
+    console.error('獲取用戶詳情失敗:', error)
+    ElMessage.error(error.response?.data?.msg || '獲取用戶詳情失敗')
+    currentViewUser.value = row
+    viewDialogVisible.value = true
+  }
+}
+
+// 刷新表格
+const refreshTable = async () => {
+  try {
+    const loading = ElLoading.service({
+      lock: true,
+      text: '更新資料中...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+
+    await fetchEmployees()
+    ElMessage.success('資料已更新')
+    loading.close()
+  } catch (error) {
+    console.error('更新資料失敗:', error)
+    ElMessage.error('更新資料失敗，請重試')
+  }
+}
+
+// 帳號狀態變更處理
 const handleAccountStatusChange = async (row, newValue) => {
   try {
     row.isProcessing = true
@@ -564,296 +851,7 @@ const handleAccountStatusChange = async (row, newValue) => {
   }
 }
 
-// 生成隨機密碼
-const generateRandomPassword = () => {
-  const characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let password = ''
-  for (let i = 0; i < 6; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length)
-    password += characters[randomIndex]
-  }
-  return password
-}
-
-// 生成預設帳號
-const generateDefaultAccount = () => {
-  if (!form.department || !form.position) {
-    form.username = '';
-    form.password = '';
-    return;
-  }
-
-  const prefix = prefixMap[form.department]?.[form.position];
-  if (!prefix) {
-    form.username = '';
-    form.password = '';
-    return;
-  }
-
-  try {
-    // 篩選出所有相同前綴的帳號
-    const existingAccounts = employeeData.value
-        .filter(employee => employee.username?.startsWith(prefix))
-        .map(employee => {
-          const numStr = employee.username.slice(prefix.length);
-          const num = parseInt(numStr, 10);
-          return isNaN(num) ? 0 : num;
-        })
-        .sort((a, b) => b - a);
-
-    // 找出最大的編號並加1
-    const maxNumber = existingAccounts.length > 0 ? existingAccounts[0] : 0;
-    const newNumber = String(maxNumber + 1).padStart(3, '0');
-
-    form.username = `${prefix}${newNumber}`;
-    form.password = generateRandomPassword();
-
-    // 驗證生成的帳號是否已存在
-    const isDuplicate = employeeData.value.some(
-        employee => employee.username === form.username
-    );
-
-    if (isDuplicate) {
-      console.error('Generated duplicate account:', form.username);
-      ElMessage.error('帳號生成錯誤，請聯繫系統管理員');
-      return;
-    }
-
-    console.log('Generated new account:', form.username);
-
-  } catch (error) {
-    console.error('Generate account error:', error);
-    ElMessage.error('帳號生成失敗，請重試');
-    form.username = '';
-    form.password = '';
-  }
-};
-
-// 開啟新增對話框
-const openAddEmployeeDialog = () => {
-  dialogVisible.value = true
-  isEdit.value = false
-  resetForm()
-  generateDefaultAccount()
-}
-
-// 重置表單
-const resetForm = () => {
-  if (formRef.value) {
-    formRef.value.resetFields()
-  }
-  form.name = ''
-  form.department = ''
-  form.position = ''
-  form.extension = ''
-  form.username = ''
-  form.password = ''
-  form.email = ''
-  emailPrefix.value = '' // 重置 email 前綴
-}
-
-// 重置進度
-const resetProgress = () => {
-  activeStep.value = 0
-  progressMessage.value = ''
-  progressVisible.value = false
-  isSubmitting.value = false
-}
-
-// 編輯處理
-const handleEdit = (row) => {
-  isEdit.value = true
-  dialogVisible.value = true
-  Object.assign(form, {
-    ...row,
-    department: row.raw_department || row.department,
-    position: row.raw_position || row.position,
-    email: row.email || ''
-  })
-  // 設置 email 前綴
-  emailPrefix.value = form.email ? form.email.split('@')[0] : ''
-}
-
-// 查看處理
-const handleView = async (row) => {
-  try {
-    // 顯示載入中
-    const loading = ElLoading.service({
-      lock: true,
-      text: '載入中...',
-      background: 'rgba(0, 0, 0, 0.7)'
-    })
-
-    // 獲取完整的用戶詳情
-    const response = await axios.get(`/api/user/employee/${row.username}/details`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-
-    // 合併表格數據和詳細數據
-    currentViewUser.value = {
-      ...row,
-      ...response.data,
-      // 保持原有的格式化後的部門和職位顯示
-      department: convertDepartment(response.data.department),
-      position: convertPosition(response.data.position),
-      // 保存原始的部門和職位代碼
-      raw_department: response.data.department,
-      raw_position: response.data.position,
-      // 確保帳號狀態正確顯示
-      isLocked: response.data.isLocked || row.isLocked,
-      isActive: response.data.isActive || row.isActive,
-      // 格式化時間相關資訊
-      createdAt: response.data.createdAt,
-      lastLoginTime: response.data.lastLoginTime,
-      // 個人資訊
-      birthday: response.data.birthday,
-      personalPhone: response.data.personalPhone,
-      // 緊急聯絡人資訊
-      emergencyContact: {
-        name: response.data.emergencyContact?.name || '',
-        phone: response.data.emergencyContact?.phone || '',
-        relationship: response.data.emergencyContact?.relationship || ''
-      }
-    }
-
-    // 關閉載入中
-    loading.close()
-
-    // 打開詳情對話框
-    viewDialogVisible.value = true
-
-  } catch (error) {
-    // 錯誤處理
-    console.error('獲取用戶詳情失敗:', error)
-    ElMessage.error(error.response?.data?.msg || '獲取用戶詳情失敗')
-
-    // 如果發生錯誤，仍然顯示基本資訊
-    currentViewUser.value = row
-    viewDialogVisible.value = true
-  }
-}
-
-
-// 刪除處理
-const handleDelete = async (row) => {
-  try {
-    await ElMessageBox.confirm(
-        `確定要刪除 ${row.name} 的資料嗎？`,
-        '警告',
-        {
-          confirmButtonText: '確定',
-          cancelButtonText: '取消',
-          type: 'warning',
-        }
-    )
-
-    await axios.delete('/api/user/employee', {
-      data: {
-        account: row.username
-      }
-    })
-
-    ElMessage.success('刪除成功')
-    await fetchEmployees()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('刪除失敗:', error)
-      ElMessage.error('刪除失敗，請重試')
-    }
-  }
-}
-
-// 提交處理
-const handleSubmit = async () => {
-  if (!formRef.value) return
-
-  try {
-    await formRef.value.validate()
-    isSubmitting.value = true
-
-    progressVisible.value = true
-    progressMessage.value = '正在生成員工編號...'
-    activeStep.value = 1
-
-    // 先獲取新的員工編號
-    const employeeIdResponse = await axios.get('/api/user/generate-employee-id')
-    const employeeId = employeeIdResponse.data.employeeId
-
-    progressMessage.value = '正在保存用戶資料...'
-    activeStep.value = 2
-
-    // 在提交數據時包含員工編號
-    const response = await axios.post('/api/user/register', {
-      employeeId,  // 添加員工編號
-      name: form.name,
-      department: form.department,
-      position: form.position,
-      account: form.username,
-      password: form.password,
-      email: form.email
-    })
-
-    progressMessage.value = '正在生成帳號...'
-    activeStep.value = 3
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    progressMessage.value = '正在發送郵件通知...'
-    activeStep.value = 4  // 步驟數增加了
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    if (response.status === 201) {
-      progressMessage.value = '處理完成！'
-      await fetchEmployees()
-
-      setTimeout(() => {
-        resetProgress()
-        dialogVisible.value = false
-        resetForm()
-        ElMessage.success('新增成功，帳號密碼已發送至使用者信箱')
-      }, 1000)
-    }
-  } catch (error) {
-    resetProgress()
-    if (error?.message?.includes('validation')) {
-      return
-    }
-    console.error('新增失敗:', error)
-    ElMessage.error('新增失敗，請重試')
-  }
-}
-
-// 刷新表格數據方法
-const refreshTable = async () => {
-  try {
-    const loading = ElLoading.service({
-      lock: true,
-      text: '更新資料中...',
-      background: 'rgba(0, 0, 0, 0.7)'
-    })
-
-    await fetchEmployees()
-    ElMessage.success('資料已更新')
-
-    loading.close()
-  } catch (error) {
-    console.error('更新資料失敗:', error)
-    ElMessage.error('更新資料失敗，請重試')
-  }
-}
-
-// 重置篩選
-const resetFilters = () => {
-  employeeIdQuery.value = ''
-  searchQuery.value = ''
-  departmentFilter.value = ''
-  positionFilter.value = ''
-  sortOrder.value = ''
-  accountStatusFilter.value = ''
-}
-
-// 組件載入時獲取數據
+// 元件載入時獲取數據
 onMounted(() => {
   fetchEmployees()
 })
@@ -883,12 +881,48 @@ onMounted(() => {
   font-size: 24px;
 }
 
+/* 統計資訊區域 */
+.statistics-bar {
+  display: flex;
+  justify-content: center;
+  margin: -15px auto 20px;
+  width: fit-content;
+}
+
+.stat-card {
+  background-color: #f5f7fa;
+  border: none;
+  width: auto;
+}
+
+:deep(.el-card__body) {
+  padding: 6px 12px;
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #409EFF;
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.stat-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #909399;
+  font-size: 13px;
+}
+
 /* 工具欄和篩選區 */
 .tool-bar {
   margin-bottom: 20px;
   display: flex;
   justify-content: flex-end;
-  gap: 8px; /* 添加按鈕間距 */
+  gap: 8px;
 }
 
 .filter-section {
@@ -903,7 +937,7 @@ onMounted(() => {
   width: 250px;
 }
 
-/* 表格相關 */
+/* 表格相關樣式 */
 .table-card {
   margin-top: 20px;
   border-radius: 8px;
@@ -954,6 +988,7 @@ onMounted(() => {
   }
 }
 
+/* Email 輸入組件 */
 .email-input-group {
   display: flex;
   align-items: center;
@@ -1046,6 +1081,28 @@ onMounted(() => {
   font-size: 14px;
 }
 
+/* 分頁容器 */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 10px 0;
+}
+
+:deep(.el-pagination) {
+  margin: 0 auto;
+  padding: 0;
+  font-weight: normal;
+
+  .el-pagination__total {
+    margin-right: 16px;
+  }
+
+  .el-pagination__sizes {
+    margin-right: 16px;
+  }
+}
+
 /* 對話框相關 */
 :deep(.el-dialog) {
   .el-dialog__body {
@@ -1095,6 +1152,20 @@ onMounted(() => {
   .table-card {
     margin-top: 10px;
   }
+
+  .pagination-container {
+    margin-top: 15px;
+  }
+
+  :deep(.el-pagination) {
+    font-size: 13px;
+
+    .el-pagination__total,
+    .el-pagination__sizes,
+    .el-pagination__jump {
+      display: none;
+    }
+  }
 }
 
 @media (max-width: 480px) {
@@ -1117,40 +1188,5 @@ onMounted(() => {
   .progress-container {
     padding: 10px;
   }
-}
-
-.statistics-bar {
-  display: flex;
-  justify-content: center;
-  margin: -15px auto 20px;
-  width: fit-content; /* 改為自適應寬度 */
-}
-
-.stat-card {
-  background-color: #f5f7fa;
-  border: none;
-  width: auto; /* 改為自適應寬度 */
-}
-
-:deep(.el-card__body) {
-  padding: 6px 12px; /* 減少內邊距 */
-}
-
-.stat-content {
-  display: flex;
-  align-items: center;
-  gap: 8px; /* 更小的間距 */
-  color: #409EFF;
-  font-size: 16px;
-  font-weight: 500;
-  white-space: nowrap; /* 防止換行 */
-}
-
-.stat-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #909399;
-  font-size: 13px;
 }
 </style>
