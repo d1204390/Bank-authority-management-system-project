@@ -1,3 +1,4 @@
+//server.js
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
@@ -28,6 +29,10 @@ app.use('/api/admin', adminRoutes);
 const userRoutes = require('./routes/user');
 app.use('/api/user', userRoutes);
 
+// Leave routes (新增)
+const leaveRoutes = require('./routes/leave');
+app.use('/api/leave', leaveRoutes);
+
 // 啟動登入記錄清理服務
 loginHistoryCleanup.start();
 
@@ -49,7 +54,7 @@ const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-// 優雅關閉服務器
+// 關閉服務器
 process.on('unhandledRejection', (err) => {
     console.error('未處理的 Promise rejection:', err);
     server.close(() => {

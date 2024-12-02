@@ -1,5 +1,7 @@
+//authMiddleware.js
 const jwt = require('jsonwebtoken');
 
+// 基本 token 驗證
 const verifyToken = (req, res, next) => {
     const bearerHeader = req.headers['authorization'];
 
@@ -17,4 +19,16 @@ const verifyToken = (req, res, next) => {
     }
 };
 
-module.exports = verifyToken;
+// 主管權限驗證
+const supervisorAuth = (req, res, next) => {
+    if (req.user && req.user.position === 'S') {
+        next();
+    } else {
+        return res.status(403).json({ message: '需要主管權限' });
+    }
+};
+
+module.exports = {
+    verifyToken,
+    supervisorAuth
+};

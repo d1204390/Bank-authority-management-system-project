@@ -108,7 +108,6 @@
             border
             :header-cell-style="tableHeaderStyle"
             :cell-style="tableCellStyle"
-            height="calc(100vh - 380px)"
         >
           <el-table-column
               fixed
@@ -116,6 +115,7 @@
               label="登入時間"
               width="180"
               :formatter="formatDate"
+              sortable
           />
           <el-table-column
               fixed

@@ -14,11 +14,11 @@
 
       <!-- 管理員導覽選單 -->
       <div class="nav-items" :class="{ 'active': isMenuOpen }">
-        <router-link to="/admin/user" class="nav-link">
+        <router-link to="/admin/EmployeesManagementPage" class="nav-link">
           <el-icon><User /></el-icon>使用者管理
         </router-link>
-        <router-link to="/admin/log" class="nav-link">
-          <el-icon><DocumentCopy /></el-icon>操作日誌
+        <router-link to="/admin/login-history" class="nav-link">
+          <el-icon><DocumentCopy /></el-icon>登入記錄
         </router-link>
         <el-dropdown>
           <span class="nav-link">
