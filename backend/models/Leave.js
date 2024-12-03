@@ -57,7 +57,10 @@ const leaveSchema = new mongoose.Schema({
             type: Date,
             default: Date.now
         }
-    }]
+    }],
+    cancelledAt: {
+        type: Date
+    }
 }, {
     timestamps: true,
     toObject: { getters: true },
