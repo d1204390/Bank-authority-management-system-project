@@ -5,7 +5,7 @@ const Admin = require('../models/Admin');
 const bcrypt = require('bcrypt');
 const User = require('../models/User');
 const LoginAttempt = require('../models/LoginAttempt');
-const { sendLockAccountEmail, sendPasswordResetEmail, sendAccountCredentials } = require('../utils/emailService');
+const { sendLockAccountEmail, sendPasswordResetEmail} = require('../utils/emailService');
 const LoginHistory = require('../models/LoginHistory');
 
 const MAX_LOGIN_ATTEMPTS = 5;
