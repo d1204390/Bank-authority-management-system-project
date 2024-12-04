@@ -213,6 +213,14 @@
                       size="small"
                   />
                 </el-tooltip>
+                <el-tooltip content="修改密碼" placement="top" :show-after="500">
+                  <el-button
+                      type="warning"
+                      @click.stop="handleResetPassword(scope.row)"
+                      :icon="Key"
+                      size="small"
+                  />
+                </el-tooltip>
                 <el-tooltip content="刪除使用者" placement="top" :show-after="500">
                   <el-button
                       type="danger"
@@ -332,13 +340,14 @@
       :user-data="currentViewUser"
       @edit="handleEdit"
   />
+
 </template>
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import {
   Plus, Edit, View, Delete, Search, Refresh,
   Lock, Unlock, CircleCheck, CircleClose,
-  User,
+  User,Key,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
@@ -851,6 +860,36 @@ const handleAccountStatusChange = async (row, newValue) => {
   }
 }
 
+// 移除密碼輸入欄位，只顯示確認信息
+const handleResetPassword = (row) => {
+  ElMessageBox.confirm(
+      `確定要重置 ${row.name} 的密碼嗎？\n重置後新密碼將發送至該用戶信箱。`,
+      '重置密碼確認',
+      {
+        confirmButtonText: '確認重置',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+  )
+      .then(async () => {
+        try {
+          const response = await axios.post('/api/admin/reset-password', {
+            account: row.username
+          });
+
+          if (response.data.success) {
+            ElMessage.success('密碼重置成功，新密碼已發送至用戶信箱');
+          }
+        } catch (error) {
+          console.error('密碼重置失敗:', error);
+          ElMessage.error(error.response?.data?.msg || '密碼重置失敗，請重試');
+        }
+      })
+      .catch(() => {
+        // 用戶取消操作
+      });
+};
+
 // 元件載入時獲取數據
 onMounted(() => {
   fetchEmployees()
@@ -1189,4 +1228,14 @@ onMounted(() => {
     padding: 10px;
   }
 }
+
+.dialog-footer {
+  padding: 20px 0 0;
+  text-align: right;
+}
+
+:deep(.el-dialog__body) {
+  padding-top: 10px;
+}
+
 </style>

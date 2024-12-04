@@ -151,7 +151,49 @@ transporter.verify((error) => {
     }
 });
 
+// 添加密碼重置通知功能
+const sendPasswordResetEmail = async (to, name, account, newPassword) => {
+    try {
+        const emailContent = {
+            from: `"系統管理員" <${process.env.EMAIL_USER}>`,
+            to: to,
+            subject: '【系統通知】密碼重置通知',
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2 style="color: #409EFF;">密碼重置通知</h2>
+                    <p>親愛的 ${name} 同仁，您好：</p>
+                    <p>您的系統帳號密碼已被管理員重置，以下是您的新登入資訊：</p>
+                    
+                    <div style="background-color: #f5f7fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <p style="margin: 5px 0;"><strong>帳號：</strong>${account}</p>
+                        <p style="margin: 5px 0;"><strong>新密碼：</strong>${newPassword}</p>
+                    </div>
+                    
+                    <div style="border-left: 4px solid #ffa726; padding: 15px; margin: 15px 0; background-color: #fff8e1;">
+                        <h3 style="color: #f57c00; margin-top: 0;">重要提醒</h3>
+                        <p style="margin: 5px 0;">1. 為了確保帳號安全，請在下次登入時立即修改密碼</p>
+                        <p style="margin: 5px 0;">2. 請妥善保管您的帳號密碼，切勿告知他人</p>
+                        <p style="margin: 5px 0;">3. 如非本人要求重置密碼，請立即聯繫系統管理員</p>
+                    </div>
+                    
+                    <hr>
+                    <p style="color: #909399; font-size: 12px;">此為系統自動發送的郵件，請勿直接回覆</p>
+                    <p style="color: #909399; font-size: 12px;">寄送時間：${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
+                </div>
+            `
+        };
+
+        const info = await transporter.sendMail(emailContent);
+        console.log('密碼重置通知郵件已發送:', info.messageId);
+        return true;
+    } catch (error) {
+        console.error('郵件發送失敗:', error);
+        return false;
+    }
+};
+
 module.exports = {
     sendLockAccountEmail,
-    sendAccountCredentials
+    sendAccountCredentials,
+    sendPasswordResetEmail
 };

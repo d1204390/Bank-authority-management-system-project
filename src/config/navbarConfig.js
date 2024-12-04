@@ -28,7 +28,7 @@ export const DEPARTMENT_NAMES = {
 export const POSITION_NAMES = {
     M: '經理',
     S: '主管',
-    C: '專員'
+    C: '科員'
 }
 
 // 共用選單項（所有角色都會看到的）
@@ -428,7 +428,7 @@ export const getSystemName = (department, position) => {
         'C': 'C',
         '經理': 'M',
         '主管': 'S',
-        '專員': 'C'
+        '科員': 'C'
     };
 
     const standardDept = deptMap[department];

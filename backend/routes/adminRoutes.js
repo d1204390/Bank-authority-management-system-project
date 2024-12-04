@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
+const bcrypt = require('bcrypt');
+const User = require('../models/User');
 const LoginAttempt = require('../models/LoginAttempt');
-const { sendLockAccountEmail } = require('../utils/emailService');
+const { sendLockAccountEmail, sendPasswordResetEmail, sendAccountCredentials } = require('../utils/emailService');
 const LoginHistory = require('../models/LoginHistory');
 
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -245,6 +247,72 @@ router.get('/login-statistics', async (req, res) => {
     } catch (error) {
         console.error('獲取登入統計失敗:', error);
         res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+// 生成隨機密碼函數
+const generateRandomPassword = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    return Array.from({ length: 6 }, () =>
+        chars.charAt(Math.floor(Math.random() * chars.length))
+    ).join('');
+};
+
+// 管理員重置用戶密碼的路由
+// 重置密碼路由
+router.post('/reset-password', async (req, res) => {
+    const { account } = req.body;
+
+    try {
+        if (!account) {
+            return res.status(400).json({
+                success: false,
+                msg: '缺少必要參數'
+            });
+        }
+
+        const user = await User.findOne({ account });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                msg: '找不到該用戶'
+            });
+        }
+
+        // 生成新的隨機密碼
+        const newPassword = generateRandomPassword();
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        user.password = hashedPassword;
+        user.isFirstLogin = true;
+        await user.save();
+
+        // 記錄操作歷史
+        await LoginHistory.create({
+            userId: user._id,
+            account: user.account,
+            employeeId: user.employeeId,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+            status: 'success',
+            failureReason: '管理員重置密碼'
+        });
+
+        // 發送密碼重置通知郵件
+        await sendPasswordResetEmail(user.email, user.name, account, newPassword);
+
+        res.json({
+            success: true,
+            msg: '密碼重置成功'
+        });
+
+    } catch (error) {
+        console.error('密碼重置失敗:', error);
+        res.status(500).json({
+            success: false,
+            msg: '密碼重置失敗，請重試'
+        });
     }
 });
 
