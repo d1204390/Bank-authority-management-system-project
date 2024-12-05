@@ -412,38 +412,132 @@ onMounted(() => {
 <style scoped>
 .leave-management-container {
   height: 100%;
+  padding: 20px;
+  background: #f5f7fa;
 }
 
+/* 頁籤容器樣式 */
 .leave-tabs {
   height: 100%;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  padding: 16px 20px;
 }
 
+/* 頁籤header樣式 */
+:deep(.el-tabs__header) {
+  margin: 0 0 20px 0;
+  border-bottom: none;
+  position: relative;
+}
+
+:deep(.el-tabs__nav-wrap::after) {
+  height: 1px;
+  background-color: #e4e7ed;
+  opacity: 0.6;
+}
+
+/* 頁籤項目樣式 */
+:deep(.el-tabs__item) {
+  height: 48px;
+  line-height: 48px;
+  font-size: 15px;
+  color: #606266;
+  transition: all 0.3s ease;
+  padding: 0 24px;
+  border-radius: 4px 4px 0 0;
+}
+
+/* 頁籤hover效果 */
+:deep(.el-tabs__item:hover) {
+  color: var(--el-color-primary);
+}
+
+/* 當前選中頁籤樣式 */
+:deep(.el-tabs__item.is-active) {
+  color: var(--el-color-primary);
+  font-weight: 600;
+  background: rgba(64, 158, 255, 0.1);
+}
+
+/* 頁籤內容區域 */
 :deep(.el-tabs__content) {
   height: calc(100% - 55px);
   overflow: auto;
+  padding: 0 4px;
 }
 
+/* 表格卡片樣式 */
 .approval-list,
 .department-history {
-  margin-top: 20px;
+  margin-top: 0;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #ebeef5;
 }
 
+/* 表格容器樣式 */
 .table-container {
   width: 100%;
   overflow-x: auto;
+  padding: 4px;
 }
 
+:deep(.el-table) {
+  border-radius: 4px;
+  overflow: hidden;
+  --el-table-border-color: #ebeef5;
+}
+
+:deep(.el-table th) {
+  background-color: #f5f7fa;
+  font-weight: 600;
+}
+
+/* 分頁容器樣式 */
 .pagination-container {
   margin-top: 20px;
-  padding-top: 15px;
+  padding: 15px 20px;
   text-align: right;
   border-top: 1px solid #ebeef5;
+  background: #fff;
+}
+
+/* 按鈕組樣式 */
+:deep(.el-button--small) {
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
 }
 
 /* 暗色主題適配 */
 :deep([class*='--dark']) {
+  .leave-management-container {
+    background: #1a1a1a;
+  }
+
+  .leave-tabs {
+    background: #141414;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.3);
+  }
+
   .text-gray {
     color: #a3a6ad;
+  }
+
+  .approval-list,
+  .department-history {
+    border-color: #363637;
+  }
+
+  :deep(.el-table th) {
+    background-color: #1d1d1d;
+  }
+
+  .pagination-container {
+    background: #141414;
+    border-color: #363637;
   }
 }
 </style>

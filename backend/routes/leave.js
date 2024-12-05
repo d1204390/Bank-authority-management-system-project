@@ -322,6 +322,169 @@ router.get('/annual-leave/remaining', verifyToken, async (req, res) => {
 });
 
 /**
+ * 獲取待審核申請列表
+ * GET /api/leave/pending-approvals
+ */
+router.get('/pending-approvals', verifyToken, supervisorAuth, async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+
+        const user = await User.findById(req.user.id)
+            .select('employeeId department')
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({ msg: '找不到用戶信息' });
+        }
+
+        // 構建查詢條件
+        const query = {
+            department: user.department,
+            status: 'pending'
+        };
+
+        // 計算總數
+        const total = await Leave.countDocuments(query);
+
+        // 獲取待審核申請
+        const leaves = await Leave.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'employeeId',
+                    foreignField: 'employeeId',
+                    as: 'employee'
+                }
+            },
+            { $unwind: '$employee' },
+            {
+                $project: {
+                    _id: 1,
+                    employeeId: 1,
+                    employeeName: '$employee.name',
+                    startDate: 1,
+                    endDate: 1,
+                    leaveType: 1,
+                    reason: 1,
+                    duration: 1,
+                    createdAt: 1
+                }
+            },
+            { $sort: { createdAt: -1 } },
+            { $skip: (parseInt(page) - 1) * parseInt(limit) },
+            { $limit: parseInt(limit) }
+        ]);
+
+        // 格式化數據
+        const formattedLeaves = leaves.map(leave => ({
+            ...leave,
+            startDate: formatDateTime(leave.startDate),
+            endDate: formatDateTime(leave.endDate),
+            formattedDuration: formatDuration(leave.duration),
+            createdAt: formatDateTime(leave.createdAt)
+        }));
+
+        res.json({
+            leaves: formattedLeaves,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
+        });
+
+    } catch (error) {
+        console.error('獲取待審核申請失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+/**
+ * 獲取部門請假歷史記錄
+ * GET /api/leave/department-history
+ */
+router.get('/department-history', verifyToken, supervisorAuth, async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+
+        const user = await User.findById(req.user.id)
+            .select('employeeId department')
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({ msg: '找不到用戶信息' });
+        }
+
+        // 構建查詢條件
+        const query = {
+            department: user.department
+        };
+
+        // 計算總數
+        const total = await Leave.countDocuments(query);
+
+        // 獲取部門請假歷史
+        const leaves = await Leave.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'employeeId',
+                    foreignField: 'employeeId',
+                    as: 'employee'
+                }
+            },
+            { $unwind: '$employee' },
+            {
+                $project: {
+                    _id: 1,
+                    employeeId: 1,
+                    employeeName: '$employee.name',
+                    startDate: 1,
+                    endDate: 1,
+                    leaveType: 1,
+                    reason: 1,
+                    duration: 1,
+                    status: 1,
+                    createdAt: 1,
+                    cancelledAt: 1,
+                    approvalChain: 1
+                }
+            },
+            { $sort: { createdAt: -1 } },
+            { $skip: (parseInt(page) - 1) * parseInt(limit) },
+            { $limit: parseInt(limit) }
+        ]);
+
+        // 格式化數據
+        const formattedLeaves = leaves.map(leave => ({
+            ...leave,
+            startDate: formatDateTime(leave.startDate),
+            endDate: formatDateTime(leave.endDate),
+            formattedDuration: formatDuration(leave.duration),
+            createdAt: formatDateTime(leave.createdAt),
+            cancelledAt: leave.cancelledAt ? formatDateTime(leave.cancelledAt) : null
+        }));
+
+        res.json({
+            leaves: formattedLeaves,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
+        });
+
+    } catch (error) {
+        console.error('獲取部門請假歷史失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+/**
  * 主管審核請假
  */
 router.post('/approve/:leaveId', verifyToken, supervisorAuth, async (req, res) => {
