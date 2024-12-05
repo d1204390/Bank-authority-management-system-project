@@ -29,42 +29,37 @@
 
     <!-- 右側內容區 -->
     <div class="content-area">
-      <component :is="currentComponent" />
+      <template v-if="activeMenuItem === 'leave'">
+        <SupervisorLeaveManagement />
+      </template>
+      <template v-else>
+        <div>功能開發中...</div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { User, Document, Calendar, Setting, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ref } from 'vue'
+import { User, Document, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+// 引入請假管理組件
+import SupervisorLeaveManagement from '@/components/SupervisorLeaveManagement.vue'
 
 // 側邊欄收合狀態
 const isSidebarCollapsed = ref(false)
-const activeMenuItem = ref('staff')
+const activeMenuItem = ref('leave') // 預設顯示請假管理
 
 // 選單項目
 const menuItems = [
   { id: 'staff', label: '員工管理', icon: User },
   { id: 'loans', label: '貸款審核', icon: Document },
   { id: 'leave', label: '請假管理', icon: Calendar },
-  { id: 'settings', label: '系統設定', icon: Setting },
 ]
 
 // 切換側邊欄
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value
 }
-
-// 動態組件
-const currentComponent = computed(() => {
-  const componentMap = {
-    staff: 'StaffManagement',
-    loans: 'LoanApproval',
-    leave: 'LeaveManagement',
-    settings: 'SystemSettings'
-  }
-  return componentMap[activeMenuItem.value]
-})
 </script>
 
 <style scoped>
