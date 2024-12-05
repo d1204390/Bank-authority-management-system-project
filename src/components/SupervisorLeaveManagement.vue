@@ -321,7 +321,11 @@ const handleApprove = async (leave) => {
         }
     )
 
-    await axios.post(`/api/leave/approve/${leave._id}`)
+    await axios.post(`/api/leave/approve/${leave._id}`, {
+      status: 'approved',
+      comment: '同意請假申請'  // 可以根據需求修改預設的核准評語
+    })
+
     ElMessage.success('已核准請假申請')
     await fetchPendingRequests()
     await fetchDepartmentHistory()
@@ -348,7 +352,11 @@ const submitReject = async () => {
     await rejectFormRef.value.validate()
     const { leaveId, reason } = rejectDialog.value.form
 
-    await axios.post(`/api/leave/reject/${leaveId}`, { reason })
+    await axios.post(`/api/leave/approve/${leaveId}`, {
+      status: 'rejected',
+      comment: reason
+    })
+
     ElMessage.success('已駁回請假申請')
     rejectDialog.value.visible = false
     await fetchPendingRequests()
