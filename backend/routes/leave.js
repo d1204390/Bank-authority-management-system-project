@@ -337,10 +337,15 @@ router.get('/pending-approvals', verifyToken, supervisorAuth, async (req, res) =
             return res.status(404).json({ msg: '找不到用戶信息' });
         }
 
-        // 構建查詢條件
+        // 構建查詢條件：
+        // 1. 只查看自己部門的請假申請
+        // 2. 只查看待審核的申請
+        // 3. 只查看科員(C)的請假申請
+        // 4. 排除自己的請假申請
         const query = {
             department: user.department,
-            status: 'pending'
+            status: 'pending',
+            employeeId: { $ne: user.employeeId } // 排除自己的請假申請
         };
 
         // 計算總數
@@ -358,6 +363,8 @@ router.get('/pending-approvals', verifyToken, supervisorAuth, async (req, res) =
                 }
             },
             { $unwind: '$employee' },
+            // 只獲取科員(C)的請假申請
+            { $match: { 'employee.position': 'C' } },
             {
                 $project: {
                     _id: 1,
@@ -417,13 +424,30 @@ router.get('/department-history', verifyToken, supervisorAuth, async (req, res) 
             return res.status(404).json({ msg: '找不到用戶信息' });
         }
 
-        // 構建查詢條件
+        // 構建查詢條件：
+        // 1. 只查看自己部門的請假記錄
         const query = {
             department: user.department
         };
 
-        // 計算總數
-        const total = await Leave.countDocuments(query);
+        // 計算總數（需要在 aggregate 後計算，因為要過濾職位）
+        const totalResult = await Leave.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'employeeId',
+                    foreignField: 'employeeId',
+                    as: 'employee'
+                }
+            },
+            { $unwind: '$employee' },
+            // 只獲取科員(C)的請假記錄
+            { $match: { 'employee.position': 'C' } },
+            { $count: 'total' }
+        ]);
+
+        const total = totalResult[0]?.total || 0;
 
         // 獲取部門請假歷史
         const leaves = await Leave.aggregate([
@@ -437,6 +461,8 @@ router.get('/department-history', verifyToken, supervisorAuth, async (req, res) 
                 }
             },
             { $unwind: '$employee' },
+            // 只獲取科員(C)的請假記錄
+            { $match: { 'employee.position': 'C' } },
             {
                 $project: {
                     _id: 1,
@@ -492,28 +518,55 @@ router.post('/approve/:leaveId', verifyToken, supervisorAuth, async (req, res) =
         const { leaveId } = req.params;
         const { status, comment } = req.body;
 
-        if (!status || !comment) {
-            return res.status(400).json({ msg: '狀態和備註都是必填的' });
+        // 驗證必要欄位
+        if (!status || !['approved', 'rejected'].includes(status)) {
+            return res.status(400).json({ msg: '請提供有效的審核狀態 (approved/rejected)' });
         }
 
-        const user = await User.findById(req.user.id)
-            .select('employeeId department')
+        if (!comment) {
+            return res.status(400).json({ msg: '備註是必填的' });
+        }
+
+        // 獲取主管資訊
+        const supervisor = await User.findById(req.user.id)
+            .select('employeeId department position')
             .lean();
 
-        if (!user) {
-            return res.status(404).json({ msg: '找不到用戶信息' });
+        if (!supervisor) {
+            return res.status(404).json({ msg: '找不到主管資訊' });
         }
 
+        // 獲取請假申請
         const leave = await Leave.findById(leaveId);
-
         if (!leave) {
             return res.status(404).json({ msg: '找不到請假申請' });
         }
 
-        if (leave.department !== user.department) {
+        // 確保主管只能審核自己部門的請假
+        if (leave.department !== supervisor.department) {
             return res.status(403).json({ msg: '無權審核其他部門的請假申請' });
         }
 
+        // 確保主管不能審核自己的請假
+        if (leave.employeeId === supervisor.employeeId) {
+            return res.status(403).json({ msg: '不能審核自己的請假申請' });
+        }
+
+        // 獲取申請人資訊
+        const employee = await User.findOne({ employeeId: leave.employeeId })
+            .select('position')
+            .lean();
+
+        if (!employee) {
+            return res.status(404).json({ msg: '找不到申請人資訊' });
+        }
+
+        // 確保只能審核科員(C)的請假
+        if (employee.position !== 'C') {
+            return res.status(403).json({ msg: '只能審核科員的請假申請' });
+        }
+
+        // 確保請假申請是待審核狀態
         if (leave.status !== 'pending') {
             return res.status(400).json({ msg: '此請假申請已被處理' });
         }
@@ -521,7 +574,7 @@ router.post('/approve/:leaveId', verifyToken, supervisorAuth, async (req, res) =
         // 更新請假狀態和審核鏈
         leave.status = status;
         leave.approvalChain.push({
-            approverEmployeeId: user.employeeId,
+            approverEmployeeId: supervisor.employeeId,
             status,
             comment,
             timestamp: new Date()
@@ -548,6 +601,14 @@ router.post('/approve/:leaveId', verifyToken, supervisorAuth, async (req, res) =
 
     } catch (error) {
         console.error('審核請假失敗:', error);
+
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({
+                msg: '資料驗證失敗',
+                errors: Object.values(error.errors).map(err => err.message)
+            });
+        }
+
         res.status(500).json({ msg: '伺服器錯誤' });
     }
 });
