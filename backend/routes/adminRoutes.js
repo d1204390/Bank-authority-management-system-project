@@ -167,7 +167,8 @@ router.get('/login-history', async (req, res) => {
             startDate,
             endDate,
             account,
-            status
+            status,
+            name
         } = req.query;
 
         const query = {};
@@ -187,6 +188,16 @@ router.get('/login-history', async (req, res) => {
         // 添加狀態篩選
         if (status) {
             query.status = status;
+        }
+
+        // 添加姓名篩選
+        if (name) {
+            // 先找出符合姓名的使用者 ID
+            const userIds = await User.find(
+                { name: new RegExp(name, 'i') },
+                '_id'
+            ).distinct('_id');
+            query.userId = { $in: userIds };
         }
 
         const total = await LoginHistory.countDocuments(query);

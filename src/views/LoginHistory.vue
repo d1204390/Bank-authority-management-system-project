@@ -2,7 +2,7 @@
   <div class="login-history">
     <!-- 統計資訊卡片 -->
     <div class="statistics-cards">
-      <el-card class="stat-card" :body-style="{ padding: '0px' }">
+      <el-card class="stat-card" :body-style="{ padding: '0px' }" @click="handleStatCardClick('todaySuccess')">
         <div class="stat-header success">
           <i class="el-icon-user"></i>
           <span>今日成功登入</span>
@@ -12,7 +12,7 @@
         </div>
       </el-card>
 
-      <el-card class="stat-card" :body-style="{ padding: '0px' }">
+      <el-card class="stat-card" :body-style="{ padding: '0px' }" @click="handleStatCardClick('todayFailed')">
         <div class="stat-header warning">
           <i class="el-icon-warning"></i>
           <span>今日失敗嘗試</span>
@@ -22,7 +22,7 @@
         </div>
       </el-card>
 
-      <el-card class="stat-card" :body-style="{ padding: '0px' }">
+      <el-card class="stat-card" :body-style="{ padding: '0px' }" @click="handleStatCardClick('totalSuccess')">
         <div class="stat-header primary">
           <i class="el-icon-data-line"></i>
           <span>總成功登入</span>
@@ -32,7 +32,7 @@
         </div>
       </el-card>
 
-      <el-card class="stat-card" :body-style="{ padding: '0px' }">
+      <el-card class="stat-card" :body-style="{ padding: '0px' }" @click="handleStatCardClick('totalFailed')">
         <div class="stat-header info">
           <i class="el-icon-time"></i>
           <span>總失敗次數</span>
@@ -45,9 +45,10 @@
 
     <div class="main-content">
       <!-- 搜尋區域 -->
-      <el-card class="search-card">
-        <el-form :inline="true" class="search-form" size="default">
-          <el-form-item label="日期範圍">
+      <el-form :inline="true" class="search-form" size="default">
+        <div class="search-form-container">
+          <!-- 日期範圍 -->
+          <el-form-item label="日期範圍" class="search-form-item">
             <el-date-picker
                 v-model="dateRange"
                 type="daterange"
@@ -55,16 +56,32 @@
                 start-placeholder="開始日期"
                 end-placeholder="結束日期"
                 :shortcuts="dateShortcuts"
+                style="width: 240px"
             />
           </el-form-item>
-          <el-form-item label="帳號">
+
+          <!-- 帳號 -->
+          <el-form-item label="帳號" class="search-form-item">
             <el-input
                 v-model="searchAccount"
                 placeholder="請輸入帳號"
                 prefix-icon="el-icon-user"
+                style="width: 150px"
             />
           </el-form-item>
-          <el-form-item label="狀態">
+
+          <!-- 姓名 -->
+          <el-form-item label="姓名" class="search-form-item">
+            <el-input
+                v-model="searchName"
+                placeholder="請輸入姓名"
+                prefix-icon="el-icon-user"
+                style="width: 150px"
+            />
+          </el-form-item>
+
+          <!-- 狀態 -->
+          <el-form-item label="狀態" class="search-form-item">
             <el-select
                 v-model="searchStatus"
                 placeholder="請選擇狀態"
@@ -72,33 +89,31 @@
                 class="status-select"
                 style="width: 120px"
             >
-              <el-option label="全部" value="all">
-                <span style="display: flex; align-items: center;">
-                  <span>全部</span>
-                </span>
-              </el-option>
+              <el-option label="全部" value="all" />
               <el-option label="成功" value="success">
-                <span style="display: flex; align-items: center; color: #67c23a;">
-                  <el-icon class="mr-1"><CircleCheck /></el-icon>
-                  <span>成功</span>
-                </span>
+          <span style="display: flex; align-items: center; color: #67c23a;">
+            <el-icon class="mr-1"><CircleCheck /></el-icon>
+            <span>成功</span>
+          </span>
               </el-option>
               <el-option label="失敗" value="failed">
-                <span style="display: flex; align-items: center; color: #f56c6c;">
-                  <el-icon class="mr-1"><CircleClose /></el-icon>
-                  <span>失敗</span>
-                </span>
+          <span style="display: flex; align-items: center; color: #f56c6c;">
+            <el-icon class="mr-1"><CircleClose /></el-icon>
+            <span>失敗</span>
+          </span>
               </el-option>
             </el-select>
           </el-form-item>
-          <el-form-item>
+
+          <!-- 按鈕 -->
+          <el-form-item class="search-form-item button-group">
             <el-button type="primary" @click="handleSearch" :icon="Search">
               搜尋
             </el-button>
             <el-button @click="resetSearch" :icon="Refresh">重置</el-button>
           </el-form-item>
-        </el-form>
-      </el-card>
+        </div>
+      </el-form>
 
       <!-- 表格區域 -->
       <el-card class="table-card">
@@ -164,7 +179,7 @@
           <el-table-column
               fixed="right"
               prop="failureReason"
-              label="失敗原因"
+              label="備註"
               width="150"
           />
         </el-table>
@@ -208,6 +223,7 @@
   border: none;
   border-radius: 8px;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .stat-card:hover {
@@ -252,7 +268,24 @@
 }
 
 .search-form {
-  padding: 20px;
+  padding: 16px;
+}
+
+.search-form-container {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-form-item {
+  margin-bottom: 0 !important;
+  margin-right: 0 !important;
+}
+
+.button-group {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .table-card {
@@ -289,6 +322,23 @@
   }
 }
 
+@media (max-width: 1200px) {
+  .search-form-container {
+    flex-wrap: wrap;
+  }
+
+  .search-form-item {
+    flex: 1 1 auto;
+  }
+
+  .button-group {
+    margin-left: 0;
+    flex-basis: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
 @media (max-width: 768px) {
   .statistics-cards {
     grid-template-columns: 1fr;
@@ -296,6 +346,10 @@
 
   .search-form {
     padding: 10px;
+  }
+
+  .search-form-item {
+    flex-basis: 100%;
   }
 }
 </style>
@@ -320,6 +374,7 @@ const statistics = ref({
   totalSuccess: 0,
   totalFailed: 0
 })
+const searchName = ref('')
 
 // 日期快捷選項
 const dateShortcuts = [
@@ -373,6 +428,7 @@ const fetchLoginHistory = async () => {
       page: currentPage.value,
       limit: pageSize.value,
       account: searchAccount.value,
+      name: searchName.value,
       status: searchStatus.value === 'all' ? '' : searchStatus.value
     }
 
@@ -409,6 +465,7 @@ const handleSearch = () => {
 const resetSearch = () => {
   dateRange.value = []
   searchAccount.value = ''
+  searchName.value = ''
   searchStatus.value = 'all'
   handleSearch()
 }
@@ -434,6 +491,38 @@ const formatDate = (row, column) => {
     minute: '2-digit',
     second: '2-digit'
   })
+}
+
+// 在 script setup 中添加
+const handleStatCardClick = (type) => {
+  // 重置搜尋條件
+  searchAccount.value = ''
+
+  const today = new Date()
+  const startOfDay = new Date(today.setHours(0, 0, 0, 0))
+  const endOfDay = new Date(today.setHours(23, 59, 59, 999))
+
+  switch (type) {
+    case 'todaySuccess':
+      dateRange.value = [startOfDay, endOfDay]
+      searchStatus.value = 'success'
+      break
+    case 'todayFailed':
+      dateRange.value = [startOfDay, endOfDay]
+      searchStatus.value = 'failed'
+      break
+    case 'totalSuccess':
+      dateRange.value = []
+      searchStatus.value = 'success'
+      break
+    case 'totalFailed':
+      dateRange.value = []
+      searchStatus.value = 'failed'
+      break
+  }
+
+  // 觸發搜尋
+  handleSearch()
 }
 
 // 生命週期
