@@ -128,7 +128,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Document, Loading, SuccessFilled, Warning, Briefcase, Calendar } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import LeaveManagement from '@/components/LeaveManagement.vue'
+import LeaveManagement from '@/components/LeaveApplication.vue'
 
 // 從 sessionStorage 獲取用戶資訊
 const getUserInfo = () => {

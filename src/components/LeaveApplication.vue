@@ -1,44 +1,19 @@
 <template>
-  <el-card class="leave-management">
-
-
-    <!-- 共通功能區 -->
+  <el-card class="leave-application">
+    <!-- 功能區 -->
     <div class="function-content">
       <div class="leave-actions">
         <el-row :gutter="10">
-          <!-- 科員請假申請 -->
-          <el-col :span="12" v-if="isStaff">
+          <!-- 請假申請按鈕 -->
+          <el-col :span="12">
             <el-button type="primary" @click="handleLeaveRequest">
               申請請假
             </el-button>
           </el-col>
 
-          <!-- 主管審核按鈕 -->
-          <el-col :span="12" v-if="isSupervisor">
-            <el-button type="warning" @click="handlePendingApprovals">
-              待審核
-              <el-badge v-if="pendingCount > 0" :value="pendingCount" />
-            </el-button>
-          </el-col>
-
           <!-- 請假紀錄按鈕 -->
           <el-col :span="12">
-            <!-- 主管顯示下拉選單 -->
-            <el-dropdown v-if="isSupervisor" @command="handleLeaveHistoryView">
-              <el-button>
-                請假紀錄
-                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="self">個人請假紀錄</el-dropdown-item>
-                  <el-dropdown-item command="department">部門請假紀錄</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-
-            <!-- 一般職員顯示普通按鈕 -->
-            <el-button v-else @click="viewPersonalLeaveHistory">
+            <el-button @click="viewPersonalLeaveHistory">
               請假紀錄
             </el-button>
           </el-col>
@@ -181,29 +156,17 @@
     <!-- 請假紀錄對話框 -->
     <el-dialog
         v-model="historyDialog.visible"
-        :title="historyDialog.title"
+        title="請假紀錄"
         width="90%"
         :max-width="1200"
         destroy-on-close
         class="leave-history-dialog"
     >
-      <!-- 主管查看部門紀錄時的提示訊息 -->
-      <el-alert
-          v-if="historyDialog.viewType === 'department'"
-          type="info"
-          show-icon
-          :closable="false"
-          class="mb-4"
-      >
-        <p>您正在以部門主管身份查看部門內所有同仁的請假紀錄</p>
-      </el-alert>
-
-      <!-- 使用 div 包裹表格以控制滾動 -->
       <div class="table-container">
         <el-table
             :data="leaveHistory"
             style="width: 100%"
-            :default-sort="{ prop: 'startDate', order: 'descending' }"
+            :default-sort="{ prop: 'createdAt', order: 'descending' }"
         >
           <el-table-column
               prop="createdAt"
@@ -277,8 +240,8 @@
                   v-else-if="scope.row.status === 'cancelled'"
                   class="text-gray"
               >
-                        已於 {{ scope.row.cancelledAt }} 撤回
-                    </span>
+                已於 {{ scope.row.cancelledAt }} 撤回
+              </span>
             </template>
           </el-table-column>
         </el-table>
@@ -297,22 +260,11 @@
     </el-dialog>
   </el-card>
 </template>
+
 <script setup>
-import { ref, computed, onMounted, watch, defineProps } from 'vue'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
-
-const props = defineProps({
-  department: {
-    type: String,
-    required: true
-  },
-  position: {
-    type: String,
-    required: true
-  }
-})
 
 // 工作時間常數
 const WORK_HOURS = {
@@ -322,14 +274,9 @@ const WORK_HOURS = {
   LUNCH_END: '13:00'
 }
 
-// 計算屬性
-const isStaff = computed(() => props.position === 'C')
-const isSupervisor = computed(() => props.position === 'S')
-
 // 響應式數據
 const leaveInfo = ref(null)
 const leaveHistory = ref([])
-const pendingCount = ref(0)
 const submitting = ref(false)
 const leaveFormRef = ref(null)
 const timeOptions = ref([])
@@ -339,8 +286,6 @@ const leaveDuration = ref('')
 const leaveDialog = ref({ visible: false })
 const historyDialog = ref({
   visible: false,
-  title: '請假紀錄',
-  viewType: 'self',
   currentPage: 1,
   pageSize: 10,
   total: 0
@@ -357,19 +302,15 @@ const leaveForm = ref({
 })
 
 // 生成時間選項
-// 生成工作時間選項
 const generateTimeOptions = (startTime = WORK_HOURS.START) => {
-  console.log('Generating time options starting from:', startTime); // 添加這行來除錯
   const times = [];
   let currentTime = startTime;
 
   while (currentTime <= WORK_HOURS.END) {
-    // 跳過午休時間
     if (!(currentTime >= WORK_HOURS.LUNCH_START && currentTime < WORK_HOURS.LUNCH_END)) {
       times.push(currentTime);
     }
 
-    // 每半小時增加一個選項
     const [hours, minutes] = currentTime.split(':').map(Number);
     let newMinutes = minutes + 30;
     let newHours = hours;
@@ -438,9 +379,7 @@ const leaveRules = {
 // 初始化數據
 const initializeData = async () => {
   try {
-    console.log('開始初始化數據...');
     const leaveInfoResponse = await axios.get('/api/leave/annual-leave/remaining');
-    console.log('收到特休資訊:', leaveInfoResponse.data);
 
     if (leaveInfoResponse.data) {
       leaveInfo.value = {
@@ -449,26 +388,14 @@ const initializeData = async () => {
         totalDays: leaveInfoResponse.data.totalDays,
         year: leaveInfoResponse.data.year
       };
-      console.log('特休資訊已更新:', leaveInfo.value);
     }
 
-    // 載入時間選項
     const timeOptionsResponse = await axios.get('/api/leave/time-options', {
       params: { date: new Date().toISOString().split('T')[0] }
     });
 
     if (timeOptionsResponse.data && timeOptionsResponse.data.timeOptions) {
       timeOptions.value = timeOptionsResponse.data.timeOptions;
-      console.log('時間選項已更新:', timeOptions.value);
-    }
-
-    // 如果是主管，獲取待審核數量
-    if (isSupervisor.value) {
-      const pendingResponse = await axios.get('/api/leave/list?status=pending');
-      if (pendingResponse.data) {
-        pendingCount.value = pendingResponse.data.pagination?.total || 0;
-        console.log('待審核數量已更新:', pendingCount.value);
-      }
     }
 
   } catch (error) {
@@ -491,19 +418,8 @@ const handleLeaveRequest = () => {
   leaveDialog.value.visible = true
 }
 
-// 處理請假紀錄查看
-const handleLeaveHistoryView = async (command) => {
-  historyDialog.value.viewType = command
-  historyDialog.value.title = command === 'self' ? '個人請假紀錄' : '部門請假紀錄'
-  historyDialog.value.currentPage = 1
-  await fetchLeaveHistory()
-  historyDialog.value.visible = true
-}
-
-// 一般職員查看請假紀錄
+// 查看請假紀錄
 const viewPersonalLeaveHistory = async () => {
-  historyDialog.value.viewType = 'self'
-  historyDialog.value.title = '個人請假紀錄'
   historyDialog.value.currentPage = 1
   await fetchLeaveHistory()
   historyDialog.value.visible = true
@@ -515,7 +431,7 @@ const fetchLeaveHistory = async () => {
     const params = {
       page: historyDialog.value.currentPage,
       limit: historyDialog.value.pageSize,
-      self: historyDialog.value.viewType === 'self' ? 'true' : 'false'
+      self: 'true'
     }
 
     const response = await axios.get('/api/leave/list', { params })
@@ -556,7 +472,6 @@ const submitLeaveRequest = async () => {
 
     ElMessage.success(response.data.msg)
     leaveDialog.value.visible = false
-    // 只需要重新獲取請假紀錄即可，不需要重新初始化所有數據
     await fetchLeaveHistory()
   } catch (error) {
     console.error('提交請假申請失敗:', error)
@@ -616,8 +531,7 @@ const disabledEndDate = (date) => {
 }
 
 // 處理撤回申請
-const handleCancelRequest = async (leave) =>
-{
+const handleCancelRequest = async (leave) => {
   try {
     await ElMessageBox.confirm(
         '確定要撤回這筆請假申請嗎？',
@@ -629,10 +543,9 @@ const handleCancelRequest = async (leave) =>
         }
     )
 
-    await axios.post(`/api/leave/cancel/${leave._id}`);
+    await axios.post(`/api/leave/cancel/${leave._id}`)
     ElMessage.success('請假申請已撤回')
     await fetchLeaveHistory()
-
   } catch (error) {
     if (error !== 'cancel') {
       console.error('撤回請假申請失敗:', error)
@@ -640,7 +553,6 @@ const handleCancelRequest = async (leave) =>
     }
   }
 }
-
 
 // 更新請假時數
 const updateLeaveDuration = async () => {
@@ -680,17 +592,16 @@ watch(
       updateLeaveDuration()
     }
 )
+
 // 組件掛載時初始化
 onMounted(async () => {
-  console.log('Component mounting...');
-  await initializeData(); // 立即調用初始化
-  timeOptions.value = generateTimeOptions();
-});
+  await initializeData()
+  timeOptions.value = generateTimeOptions()
+})
 </script>
 
 <style scoped>
-/* ---------- 1. 基礎佈局樣式 ---------- */
-.leave-management {
+.leave-application {
   height: 100%;
 }
 
@@ -698,28 +609,15 @@ onMounted(async () => {
   min-width: 320px;
 }
 
-/* ---------- 2. 功能區域樣式 ---------- */
-.function-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px;
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.function-header .el-icon {
-  margin-right: 8px;
-  font-size: 20px;
-  color: #409EFF;
+.function-content {
+  margin-bottom: 20px;
 }
 
 .leave-actions {
   margin-bottom: 15px;
 }
 
-/* ---------- 3. 請假統計和時數顯示 ---------- */
-.leave-summary,
-.leave-duration {
+.leave-summary {
   margin-top: 15px;
   padding: 12px;
   background-color: #f5f7fa;
@@ -734,6 +632,10 @@ onMounted(async () => {
 }
 
 .leave-duration {
+  margin-top: 15px;
+  padding: 12px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
   color: #606266;
   text-align: center;
   font-weight: bold;
@@ -744,7 +646,6 @@ onMounted(async () => {
   padding: 10px;
 }
 
-/* ---------- 4. 表格相關樣式 ---------- */
 .table-container {
   width: 100%;
   overflow-x: auto;
@@ -755,124 +656,8 @@ onMounted(async () => {
   margin-top: 10px;
   border-radius: 8px;
   overflow: hidden;
-  --el-table-header-bg-color: var(--el-fill-color-light);
-  --el-table-row-hover-bg-color: var(--el-fill-color);
 }
 
-:deep(.el-table th) {
-  background-color: #f5f7fa;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  padding: 8px 0;
-}
-
-:deep(.el-table td) {
-  padding: 8px 0;
-}
-
-:deep(.el-table tr:hover) {
-  background-color: #f5f7fa;
-}
-
-:deep(.el-table__fixed-right) {
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
-}
-
-/* ---------- 5. 滾動條樣式 ---------- */
-/* 表格容器滾動條 */
-.table-container::-webkit-scrollbar {
-  height: 8px;
-}
-
-.table-container::-webkit-scrollbar-thumb {
-  background-color: #e0e0e0;
-  border-radius: 4px;
-}
-
-.table-container::-webkit-scrollbar-track {
-  background-color: #f5f5f5;
-}
-
-/* 表格內部滾動條 */
-:deep(.el-table__body-wrapper::-webkit-scrollbar) {
-  width: 6px;
-  height: 6px;
-}
-
-:deep(.el-table__body-wrapper::-webkit-scrollbar-thumb) {
-  border-radius: 3px;
-  background-color: var(--el-border-color-lighter);
-}
-
-:deep(.el-table__body-wrapper::-webkit-scrollbar-track) {
-  background-color: transparent;
-}
-
-/* ---------- 6. 表單元件樣式 ---------- */
-.leave-form {
-  max-width: 100%;
-}
-
-:deep(.el-form-item) {
-  margin-bottom: 20px;
-}
-
-:deep(.el-form-item:last-child) {
-  margin-bottom: 0;
-}
-
-:deep(.el-form-item__label) {
-  font-weight: 500;
-  color: #303133;
-}
-
-:deep(.el-select),
-:deep(.el-date-picker),
-:deep(.el-time-select) {
-  width: 100%;
-}
-
-:deep(.el-textarea__inner) {
-  font-family: inherit;
-  padding: 8px 12px;
-}
-
-/* ---------- 7. UI元件共用樣式 ---------- */
-/* Dialog樣式 */
-:deep(.el-dialog__body) {
-  padding: 20px 25px;
-}
-
-:deep(.el-dialog__footer) {
-  padding: 15px 25px 20px;
-  border-top: 1px solid #ebeef5;
-}
-
-/* Tag樣式 */
-:deep(.el-tag) {
-  border-radius: 4px;
-  font-weight: 500;
-  padding: 0 8px;
-  height: 24px;
-  line-height: 22px;
-}
-
-/* Alert樣式 */
-:deep(.el-alert) {
-  margin-bottom: 16px;
-}
-
-:deep(.el-alert__description) {
-  margin: 0;
-  font-size: 13px;
-}
-
-/* Badge樣式 */
-:deep(.el-badge__content.el-badge__content--danger) {
-  background-color: #F56C6C;
-}
-
-/* 分頁樣式 */
 .pagination-container {
   margin-top: 20px;
   padding-top: 15px;
@@ -880,7 +665,6 @@ onMounted(async () => {
   border-top: 1px solid #ebeef5;
 }
 
-/* ---------- 8. 輔助樣式 ---------- */
 .text-gray {
   color: var(--el-text-color-secondary);
   font-size: 13px;
@@ -892,43 +676,24 @@ onMounted(async () => {
   gap: 10px;
 }
 
-/* ---------- 9. 響應式設計 ---------- */
-@media screen and (max-width: 1200px) {
-  :deep(.leave-reason-column) { min-width: 150px; }
-  :deep(.leave-time-column) { min-width: 140px; }
-}
-
-@media screen and (max-width: 992px) {
-  :deep(.leave-time-column) { min-width: 130px; }
-  :deep(.leave-type-column),
-  :deep(.leave-duration-column),
-  :deep(.leave-status-column) { min-width: 90px; }
-}
-
+/* 響應式設計 */
 @media screen and (max-width: 768px) {
-  :deep(.el-table) { font-size: 13px; }
-  :deep(.leave-time-column) { min-width: 120px; }
-  :deep(.leave-reason-column) { min-width: 120px; }
+  :deep(.el-table) {
+    font-size: 13px;
+  }
+
   :deep(.el-button--small) {
     padding: 6px 12px;
     font-size: 12px;
   }
+
   :deep(.el-tag--small) {
     padding: 0 6px;
     font-size: 11px;
   }
 }
 
-@media screen and (max-width: 576px) {
-  :deep(.el-table) { font-size: 12px; }
-  :deep(.leave-time-column) { min-width: 110px; }
-  :deep(.leave-type-column),
-  :deep(.leave-duration-column),
-  :deep(.leave-status-column) { min-width: 80px; }
-  :deep(.leave-action-column) { min-width: 100px; }
-}
-
-/* ---------- 10. 暗色主題適配 ---------- */
+/* 暗色主題適配 */
 :deep([class*='--dark']) {
   .leave-summary,
   .leave-duration {
@@ -938,24 +703,6 @@ onMounted(async () => {
 
   .text-gray {
     color: #a3a6ad;
-  }
-
-  .table-container::-webkit-scrollbar-thumb {
-    background-color: #4c4d4f;
-  }
-
-  .table-container::-webkit-scrollbar-track {
-    background-color: #363637;
-  }
-
-  .el-table {
-    --el-table-header-bg-color: var(--el-bg-color-overlay);
-    --el-table-row-hover-bg-color: var(--el-fill-color-darker);
-  }
-
-  :deep(.el-table th) {
-    background-color: #363637;
-    color: #e5eaf3;
   }
 }
 </style>
