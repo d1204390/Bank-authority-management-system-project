@@ -223,6 +223,28 @@
               show-overflow-tooltip
           />
           <el-table-column
+              label="審核意見"
+              min-width="200"
+              show-overflow-tooltip
+          >
+            <template #default="scope">
+              <template v-if="scope.row.approvalChain && scope.row.approvalChain.length > 0">
+                <div>
+                  {{ scope.row.approvalChain[scope.row.approvalChain.length - 1].comment }}
+                  <el-tooltip
+                      effect="dark"
+                      placement="top"
+                      :content="'審核時間: ' + scope.row.approvalChain[scope.row.approvalChain.length - 1].timestamp"
+                  >
+                    <el-icon class="ml-1"><InfoFilled /></el-icon>
+                  </el-tooltip>
+                </div>
+              </template>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column
               label="操作"
               width="120"
               fixed="right"
@@ -264,6 +286,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 // 工作時間常數

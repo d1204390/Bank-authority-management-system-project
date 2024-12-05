@@ -230,7 +230,11 @@ router.get('/list', verifyToken, async (req, res) => {
             formattedDuration: formatDuration(leave.duration),
             createdAt: formatDateTime(leave.createdAt),
             cancelledAt: leave.cancelledAt ? formatDateTime(leave.cancelledAt) : null,
-            updatedAt: formatDateTime(leave.updatedAt)
+            // 格式化審核鏈資訊
+            approvalChain: leave.approvalChain?.map(approval => ({
+                ...approval,
+                timestamp: formatDateTime(new Date(approval.timestamp))
+            })) || []
         }));
 
         // 組織響應數據
