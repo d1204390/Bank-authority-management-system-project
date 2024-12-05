@@ -71,7 +71,7 @@ const toggleSidebar = () => {
 
 .sidebar {
   width: 240px;
-  background-color: #304156;
+  background-color: #265d93;
   transition: all 0.3s;
   position: relative;
   color: #fff;
@@ -87,7 +87,7 @@ const toggleSidebar = () => {
   position: absolute;
   top: 16px;
   right: -16px;
-  background-color: #689bde;
+  background-color: #faa82d;
   border-radius: 50%;
   display: flex;
   align-items: center;
