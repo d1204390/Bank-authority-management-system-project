@@ -1,5 +1,6 @@
 <template>
   <div id="app">
+    <InactivityTimer v-if="isUserLoggedIn || isAdminLoggedIn"/>
     <!-- 根據登入狀態和用戶角色切換導覽列 -->
     <AdminNavbar v-if="isAdminLoggedIn"/>
     <UserNavbar v-else-if="isUserLoggedIn"/>
@@ -12,14 +13,16 @@
   </div>
 </template>
 
+
 <script setup>
 import { computed, onMounted, watch, ref} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
-import TheNavbar from '@/components/Navbar.vue'
-import AdminNavbar from '@/components/AdminNavbar.vue'
-import UserNavbar from '@/components/UserNavbar.vue'
-import TheFooter from '@/components/Footer.vue'
-import BackToTop from '@/components/BackToTop.vue'
+import TheNavbar from '@/components/navigation/Navbar.vue'
+import AdminNavbar from '@/components/navigation/AdminNavbar.vue'
+import UserNavbar from '@/components/navigation/UserNavbar.vue'
+import TheFooter from '@/components/navigation/Footer.vue'
+import BackToTop from '@/components/navigation/BackToTop.vue'
+import InactivityTimer from '@/components/InactivityTimer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -63,7 +66,6 @@ watch(route, (newRoute) => {
   if (newRoute.path.match(/^\/(?:business|finance|loan|user)/)) {
     if (!token || !userInfo.department) {
       router.replace('/')
-      return
     }
   }
 })

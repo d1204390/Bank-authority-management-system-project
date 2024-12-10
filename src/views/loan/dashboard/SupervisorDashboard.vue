@@ -2,8 +2,8 @@
   <div class="dashboard-layout">
     <!-- 左側選單 -->
     <div class="sidebar" :class="{ 'collapsed': isSidebarCollapsed }">
-      <!-- 收合按鈕 -->
-      <div class="collapse-btn" @click="toggleSidebar">
+      <!-- 頂部收合按鈕 -->
+      <div class="collapse-btn collapse-btn-top" @click="toggleSidebar">
         <el-icon>
           <ArrowLeft v-if="!isSidebarCollapsed" />
           <ArrowRight v-else />
@@ -25,12 +25,23 @@
           <span v-show="!isSidebarCollapsed">{{ item.label }}</span>
         </div>
       </div>
+
+      <!-- 底部收合按鈕 -->
+      <div class="collapse-btn collapse-btn-bottom" @click="toggleSidebar">
+        <el-icon>
+          <ArrowLeft v-if="!isSidebarCollapsed" />
+          <ArrowRight v-else />
+        </el-icon>
+      </div>
     </div>
 
     <!-- 右側內容區 -->
     <div class="content-area">
       <template v-if="activeMenuItem === 'leave'">
         <SupervisorLeaveManagement />
+      </template>
+      <template v-else-if="activeMenuItem === 'staff'">
+        <SupervisorStaffManagement />
       </template>
       <template v-else>
         <div>功能開發中...</div>
@@ -40,23 +51,53 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, provide } from 'vue'
 import { User, Document, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
-// 引入請假管理組件
-import SupervisorLeaveManagement from '@/components/SupervisorLeaveManagement.vue'
+import SupervisorLeaveManagement from '@/components/leave/SupervisorLeaveManagement.vue'
+import SupervisorStaffManagement from '@/components/staff/SupervisorStaffManagement.vue'
+import { ElMessage } from 'element-plus'
+import axios from 'axios'
 
-// 側邊欄收合狀態
+const allStaffList = ref([])
+const staffDataLoaded = ref(false)
+const loadingStaffData = ref(false)
+
+const fetchAllDepartmentStaff = async () => {
+  if (staffDataLoaded.value || loadingStaffData.value) return
+
+  loadingStaffData.value = true
+  try {
+    const response = await axios.get('/api/user/all-department-employees')
+    allStaffList.value = response.data
+    staffDataLoaded.value = true
+  } catch (error) {
+    console.error('獲取部門員工失敗:', error)
+    if (error.response?.status === 403) {
+      ElMessage.error('您沒有權限查看部門員工資料')
+    } else {
+      ElMessage.error('獲取部門員工失敗')
+    }
+  } finally {
+    loadingStaffData.value = false
+  }
+}
+
+provide('staffManagement', {
+  allStaffList,
+  staffDataLoaded,
+  loadingStaffData,
+  fetchAllDepartmentStaff
+})
+
 const isSidebarCollapsed = ref(false)
-const activeMenuItem = ref('leave') // 預設顯示請假管理
+const activeMenuItem = ref('leave')
 
-// 選單項目
 const menuItems = [
   { id: 'staff', label: '員工管理', icon: User },
   { id: 'loans', label: '貸款審核', icon: Document },
   { id: 'leave', label: '請假管理', icon: Calendar },
 ]
 
-// 切換側邊欄
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value
 }
@@ -84,9 +125,6 @@ const toggleSidebar = () => {
 .collapse-btn {
   height: 32px;
   width: 32px;
-  position: absolute;
-  top: 16px;
-  right: -16px;
   background-color: #faa82d;
   border-radius: 50%;
   display: flex;
@@ -95,10 +133,20 @@ const toggleSidebar = () => {
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   z-index: 1;
+  position: absolute;
+  right: -16px;
+}
+
+.collapse-btn-top {
+  top: 16px;
+}
+
+.collapse-btn-bottom {
+  bottom: 16px;
 }
 
 .menu-container {
-  padding: 64px 0 0;
+  padding: 64px 0 64px;  /* 增加底部內邊距，為底部按鈕留出空間 */
 }
 
 .menu-item {
