@@ -175,18 +175,9 @@ const filteredStaffList = computed(() => {
 
 // 日期時間格式化函數
 const formatDateTime = (dateStr) => {
-  if (!dateStr || dateStr === '-') return '-'
+  if (!dateStr || dateStr === '-' || dateStr === 'undefined') return '-'
   try {
-    // 如果是 ISO 格式的字符串，需要先轉換
-    let date
-    if (typeof dateStr === 'string' && dateStr.includes('T')) {
-      // 處理 ISO 格式
-      date = new Date(dateStr)
-    } else {
-      // 處理其他格式
-      date = new Date(Date.parse(dateStr))
-    }
-
+    const date = new Date(dateStr)
     if (isNaN(date.getTime())) {
       return '-'
     }
@@ -201,22 +192,17 @@ const formatDateTime = (dateStr) => {
       timeZone: 'Asia/Taipei'
     }).format(date).replace(/\//g, '-')
   } catch (error) {
-    console.error('日期格式化錯誤:', error, 'dateStr:', dateStr)
+    console.debug('日期格式化錯誤:', error, 'dateStr:', dateStr) // 改用 debug level
     return '-'
   }
 }
 
+
 // 日期格式化函數
 const formatDate = (dateStr) => {
-  if (!dateStr || dateStr === '-') return '-'
+  if (!dateStr || dateStr === '-' || dateStr === 'undefined') return '-'
   try {
-    let date
-    if (typeof dateStr === 'string' && dateStr.includes('T')) {
-      date = new Date(dateStr)
-    } else {
-      date = new Date(Date.parse(dateStr))
-    }
-
+    const date = new Date(dateStr)
     if (isNaN(date.getTime())) {
       return '-'
     }
@@ -228,7 +214,7 @@ const formatDate = (dateStr) => {
       timeZone: 'Asia/Taipei'
     }).format(date).replace(/\//g, '-')
   } catch (error) {
-    console.error('日期格式化錯誤:', error, 'dateStr:', dateStr)
+    console.debug('日期格式化錯誤:', error, 'dateStr:', dateStr) // 改用 debug level
     return '-'
   }
 }
