@@ -70,8 +70,8 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { getTokenInfo } from '@/router/guards'
-import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
-import VerificationDialog from '@/components/VerificationDialog.vue'
+import ChangePasswordDialog from '@/components/dialogs/ChangePasswordDialog.vue'
+import VerificationDialog from '@/components/dialogs/VerificationDialog.vue'
 
 const router = useRouter()
 

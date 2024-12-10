@@ -1,35 +1,51 @@
 <template>
-  <el-card class="leave-application">
+  <el-card class="leave-application" :class="{ 'is-dark': isDark }">
     <!-- 功能區 -->
-    <div class="function-content">
-      <div class="leave-actions">
-        <el-row :gutter="10">
-          <!-- 請假申請按鈕 -->
+    <div class="function-area">
+      <!-- 按鈕區 -->
+      <div class="action-buttons">
+        <el-row :gutter="16">
           <el-col :span="12">
-            <el-button type="primary" @click="handleLeaveRequest">
+            <el-button
+                type="primary"
+                class="action-btn"
+                :loading="submitting"
+                @click="handleLeaveRequest"
+            >
+              <el-icon><Plus /></el-icon>
               申請請假
             </el-button>
           </el-col>
-
-          <!-- 請假紀錄按鈕 -->
           <el-col :span="12">
-            <el-button @click="viewPersonalLeaveHistory">
+            <el-button
+                class="action-btn"
+                @click="viewPersonalLeaveHistory"
+            >
+              <el-icon><Document /></el-icon>
               請假紀錄
             </el-button>
           </el-col>
         </el-row>
       </div>
 
-      <!-- 請假統計 -->
-      <div class="leave-summary">
-        <el-row v-if="leaveInfo">
-          <el-col :span="12">
-            <p>剩餘特休：{{ leaveInfo.remainingDays }} 天</p>
-          </el-col>
-          <el-col :span="12">
-            <p>已用特休：{{ leaveInfo.usedDays }} 天</p>
-          </el-col>
-        </el-row>
+      <!-- 特休統計區 -->
+      <div class="statistics-area">
+        <template v-if="leaveInfo">
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <div class="stat-card">
+                <h3 class="stat-title">剩餘特休</h3>
+                <p class="stat-value">{{ leaveInfo.remainingDays }} 天</p>
+              </div>
+            </el-col>
+            <el-col :span="12">
+              <div class="stat-card">
+                <h3 class="stat-title">已用特休</h3>
+                <p class="stat-value">{{ leaveInfo.usedDays }} 天</p>
+              </div>
+            </el-col>
+          </el-row>
+        </template>
         <el-row v-else>
           <el-col :span="24">
             <div class="loading-placeholder">
@@ -48,21 +64,25 @@
         destroy-on-close
     >
       <el-form
+          ref="leaveFormRef"
           :model="leaveForm"
           :rules="leaveRules"
-          ref="leaveFormRef"
           label-width="100px"
           class="leave-form"
       >
         <!-- 請假類型 -->
         <el-form-item label="請假類型" prop="type">
-          <el-select v-model="leaveForm.type" placeholder="請選擇" class="w-full">
-            <el-option label="特休" value="annual" />
-            <el-option label="事假" value="personal" />
-            <el-option label="病假" value="sick" />
-            <el-option label="喪假" value="funeral" />
-            <el-option label="婚假" value="marriage" />
-            <el-option label="產假" value="maternity" />
+          <el-select
+              v-model="leaveForm.type"
+              placeholder="請選擇"
+              class="form-select"
+          >
+            <el-option
+                v-for="(text, type) in leaveTypes"
+                :key="type"
+                :label="text"
+                :value="type"
+            />
           </el-select>
         </el-form-item>
 
@@ -74,8 +94,8 @@
               placeholder="選擇開始日期"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
-              :disabledDate="disabledDate"
-              class="w-full"
+              :disabled-date="disabledDate"
+              class="form-date-picker"
           />
         </el-form-item>
         <el-form-item label="開始時間" prop="startTime">
@@ -83,7 +103,7 @@
               v-model="leaveForm.startTime"
               placeholder="選擇開始時間"
               :disabled="!leaveForm.startDate"
-              class="w-full"
+              class="form-select"
           >
             <el-option
                 v-for="time in timeOptions"
@@ -103,8 +123,8 @@
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
               :disabled="!leaveForm.startDate"
-              :disabledDate="disabledEndDate"
-              class="w-full"
+              :disabled-date="disabledEndDate"
+              class="form-date-picker"
           />
         </el-form-item>
         <el-form-item label="結束時間" prop="endTime">
@@ -112,7 +132,7 @@
               v-model="leaveForm.endTime"
               placeholder="選擇結束時間"
               :disabled="!leaveForm.startDate || !leaveForm.endDate"
-              class="w-full"
+              class="form-select"
           >
             <el-option
                 v-for="time in endTimeOptions"
@@ -130,26 +150,27 @@
               type="textarea"
               rows="3"
               placeholder="請填寫請假原因"
+              resize="none"
           />
         </el-form-item>
 
-        <!-- 請假時數顯示 -->
-        <div v-if="leaveDuration" class="leave-duration">
+        <!-- 請假時數提示 -->
+        <div v-if="leaveDuration" class="duration-info">
           請假時數：{{ leaveDuration }}
         </div>
       </el-form>
 
       <template #footer>
-        <span class="dialog-footer">
+        <div class="dialog-footer">
           <el-button @click="leaveDialog.visible = false">取消</el-button>
           <el-button
               type="primary"
-              @click="submitLeaveRequest"
               :loading="submitting"
+              @click="submitLeaveRequest"
           >
             提交申請
           </el-button>
-        </span>
+        </div>
       </template>
     </el-dialog>
 
@@ -158,9 +179,8 @@
         v-model="historyDialog.visible"
         title="請假紀錄"
         width="90%"
-        :max-width="1200"
         destroy-on-close
-        class="leave-history-dialog"
+        class="history-dialog"
     >
       <div class="table-container">
         <el-table
@@ -190,8 +210,8 @@
               label="類型"
               width="100"
           >
-            <template #default="scope">
-              {{ getLeaveTypeText(scope.row.leaveType) }}
+            <template #default="{ row }">
+              {{ leaveTypes[row.leaveType] }}
             </template>
           </el-table-column>
           <el-table-column
@@ -200,8 +220,8 @@
               width="100"
               align="center"
           >
-            <template #default="scope">
-              {{ scope.row.formattedDuration }}
+            <template #default="{ row }">
+              {{ row.formattedDuration }}
             </template>
           </el-table-column>
           <el-table-column
@@ -210,9 +230,9 @@
               width="100"
               align="center"
           >
-            <template #default="scope">
-              <el-tag :type="getStatusType(scope.row.status)">
-                {{ getStatusText(scope.row.status) }}
+            <template #default="{ row }">
+              <el-tag :type="getStatusType(row.status)">
+                {{ statusTypes[row.status] }}
               </el-tag>
             </template>
           </el-table-column>
@@ -227,42 +247,45 @@
               min-width="200"
               show-overflow-tooltip
           >
-            <template #default="scope">
-              <template v-if="scope.row.approvalChain && scope.row.approvalChain.length > 0">
-                <div>
-                  {{ scope.row.approvalChain[scope.row.approvalChain.length - 1].comment }}
+            <template #default="{ row }">
+              <template v-if="row.approvalChain?.length">
+                <div class="approval-info">
+                  {{ row.approvalChain[row.approvalChain.length - 1].comment }}
                   <el-tooltip
                       effect="dark"
                       placement="top"
-                      :content="'審核時間: ' + scope.row.approvalChain[scope.row.approvalChain.length - 1].timestamp"
                   >
-                    <el-icon class="ml-1"><InfoFilled /></el-icon>
+                    <template #content>
+                      <div>審核主管: {{ row.approvalChain[row.approvalChain.length - 1].approverName }}</div>
+                      <div>審核時間: {{ row.approvalChain[row.approvalChain.length - 1].timestamp }}</div>
+                      <div>審核結果: {{ statusTypes[row.approvalChain[row.approvalChain.length - 1].status] }}</div>
+                    </template>
+                    <el-icon class="info-icon"><InfoFilled /></el-icon>
                   </el-tooltip>
                 </div>
               </template>
               <span v-else>-</span>
             </template>
           </el-table-column>
-
           <el-table-column
               label="操作"
               width="120"
               fixed="right"
           >
-            <template #default="scope">
+            <template #default="{ row }">
               <el-button
-                  v-if="scope.row.status === 'pending'"
+                  v-if="row.status === 'pending'"
                   type="danger"
                   size="small"
-                  @click="handleCancelRequest(scope.row)"
+                  @click="handleCancelRequest(row)"
               >
                 撤回申請
               </el-button>
               <span
-                  v-else-if="scope.row.status === 'cancelled'"
-                  class="text-gray"
+                  v-else-if="row.status === 'cancelled'"
+                  class="cancelled-text"
               >
-                已於 {{ scope.row.cancelledAt }} 撤回
+                已於 {{ row.cancelledAt }} 撤回
               </span>
             </template>
           </el-table-column>
@@ -286,10 +309,10 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { InfoFilled, Plus, Document } from '@element-plus/icons-vue'
 import axios from 'axios'
 
-// 工作時間常數
+// 常量定義
 const WORK_HOURS = {
   START: '08:00',
   END: '17:00',
@@ -297,7 +320,31 @@ const WORK_HOURS = {
   LUNCH_END: '13:00'
 }
 
-// 響應式數據
+const leaveTypes = {
+  annual: '特休',
+  personal: '事假',
+  sick: '病假',
+  funeral: '喪假',
+  marriage: '婚假',
+  maternity: '產假'
+}
+
+const statusTypes = {
+  pending: '待審核',
+  approved: '已核准',
+  rejected: '已駁回',
+  cancelled: '已撤回'
+}
+
+const statusStyles = {
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  cancelled: 'info'
+}
+
+// 響應式狀態
+const isDark = ref(false)
 const leaveInfo = ref(null)
 const leaveHistory = ref([])
 const submitting = ref(false)
@@ -324,32 +371,7 @@ const leaveForm = ref({
   reason: ''
 })
 
-// 生成時間選項
-const generateTimeOptions = (startTime = WORK_HOURS.START) => {
-  const times = [];
-  let currentTime = startTime;
-
-  while (currentTime <= WORK_HOURS.END) {
-    if (!(currentTime >= WORK_HOURS.LUNCH_START && currentTime < WORK_HOURS.LUNCH_END)) {
-      times.push(currentTime);
-    }
-
-    const [hours, minutes] = currentTime.split(':').map(Number);
-    let newMinutes = minutes + 30;
-    let newHours = hours;
-
-    if (newMinutes >= 60) {
-      newMinutes = 0;
-      newHours += 1;
-    }
-
-    currentTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
-  }
-
-  return times;
-};
-
-// 計算可選的結束時間選項
+// 計算屬性
 const endTimeOptions = computed(() => {
   if (!leaveForm.value.startDate || !leaveForm.value.endDate) {
     return generateTimeOptions()
@@ -399,35 +421,58 @@ const leaveRules = {
   reason: [{ required: true, message: '請填寫請假原因', trigger: 'blur' }]
 }
 
-// 初始化數據
+// 方法定義
+const generateTimeOptions = (startTime = WORK_HOURS.START) => {
+  const times = []
+  let currentTime = startTime
+
+  while (currentTime <= WORK_HOURS.END) {
+    if (!(currentTime >= WORK_HOURS.LUNCH_START && currentTime < WORK_HOURS.LUNCH_END)) {
+      times.push(currentTime)
+    }
+
+    const [hours, minutes] = currentTime.split(':').map(Number)
+    let newMinutes = minutes + 30
+    let newHours = hours
+
+    if (newMinutes >= 60) {
+      newMinutes = 0
+      newHours += 1
+    }
+
+    currentTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`
+  }
+
+  return times
+}
+
 const initializeData = async () => {
   try {
-    const leaveInfoResponse = await axios.get('/api/leave/annual-leave/remaining');
+    const [leaveInfoRes, timeOptionsRes] = await Promise.all([
+      axios.get('/api/leave/annual-leave/remaining'),
+      axios.get('/api/leave/time-options', {
+        params: { date: new Date().toISOString().split('T')[0] }
+      })
+    ])
 
-    if (leaveInfoResponse.data) {
+    if (leaveInfoRes.data) {
       leaveInfo.value = {
-        remainingDays: Number(leaveInfoResponse.data.remainingDays).toFixed(1),
-        usedDays: Number(leaveInfoResponse.data.usedDays).toFixed(1),
-        totalDays: leaveInfoResponse.data.totalDays,
-        year: leaveInfoResponse.data.year
-      };
+        remainingDays: Number(leaveInfoRes.data.remainingDays).toFixed(1),
+        usedDays: Number(leaveInfoRes.data.usedDays).toFixed(1),
+        totalDays: leaveInfoRes.data.totalDays,
+        year: leaveInfoRes.data.year
+      }
     }
 
-    const timeOptionsResponse = await axios.get('/api/leave/time-options', {
-      params: { date: new Date().toISOString().split('T')[0] }
-    });
-
-    if (timeOptionsResponse.data && timeOptionsResponse.data.timeOptions) {
-      timeOptions.value = timeOptionsResponse.data.timeOptions;
+    if (timeOptionsRes.data?.timeOptions) {
+      timeOptions.value = timeOptionsRes.data.timeOptions
     }
-
   } catch (error) {
-    console.error('初始化數據失敗:', error);
-    ElMessage.error(error.response?.data?.msg || '獲取數據失敗，請稍後再試');
+    console.error('初始化數據失敗:', error)
+    ElMessage.error(error.response?.data?.msg || '獲取數據失敗，請稍後再試')
   }
-};
+}
 
-// 請假申請處理
 const handleLeaveRequest = () => {
   leaveForm.value = {
     type: '',
@@ -441,14 +486,12 @@ const handleLeaveRequest = () => {
   leaveDialog.value.visible = true
 }
 
-// 查看請假紀錄
 const viewPersonalLeaveHistory = async () => {
   historyDialog.value.currentPage = 1
   await fetchLeaveHistory()
   historyDialog.value.visible = true
 }
 
-// 獲取請假紀錄
 const fetchLeaveHistory = async () => {
   try {
     const params = {
@@ -459,7 +502,7 @@ const fetchLeaveHistory = async () => {
 
     const response = await axios.get('/api/leave/list', { params })
 
-    if (response.data && Array.isArray(response.data.leaves)) {
+    if (response.data?.leaves) {
       leaveHistory.value = response.data.leaves
       historyDialog.value.total = response.data.pagination.total
     }
@@ -469,13 +512,11 @@ const fetchLeaveHistory = async () => {
   }
 }
 
-// 處理分頁變更
 const handlePageChange = (page) => {
   historyDialog.value.currentPage = page
   fetchLeaveHistory()
 }
 
-// 提交請假申請
 const submitLeaveRequest = async () => {
   if (!leaveFormRef.value) return
 
@@ -495,7 +536,10 @@ const submitLeaveRequest = async () => {
 
     ElMessage.success(response.data.msg)
     leaveDialog.value.visible = false
-    await fetchLeaveHistory()
+    await Promise.all([
+      fetchLeaveHistory(),
+      initializeData()
+    ])
   } catch (error) {
     console.error('提交請假申請失敗:', error)
     ElMessage.error(error.response?.data?.msg || '提交失敗，請稍後再試')
@@ -504,40 +548,10 @@ const submitLeaveRequest = async () => {
   }
 }
 
-// 工具函數
-const getLeaveTypeText = (type) => {
-  const types = {
-    annual: '特休',
-    personal: '事假',
-    sick: '病假',
-    funeral: '喪假',
-    marriage: '婚假',
-    maternity: '產假'
-  }
-  return types[type] || type
-}
-
-const getStatusText = (status) => {
-  const statusMap = {
-    pending: '待審核',
-    approved: '已核准',
-    rejected: '已駁回',
-    cancelled: '已撤回'
-  }
-  return statusMap[status] || status
-}
-
 const getStatusType = (status) => {
-  const typeMap = {
-    pending: 'warning',
-    approved: 'success',
-    rejected: 'danger',
-    cancelled: 'info'
-  }
-  return typeMap[status] || ''
+  return statusStyles[status] || ''
 }
 
-// 日期限制函數
 const disabledDate = (date) => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -545,15 +559,12 @@ const disabledDate = (date) => {
 }
 
 const disabledEndDate = (date) => {
-  if (!leaveForm.value.startDate) {
-    return false
-  }
+  if (!leaveForm.value.startDate) return false
   const startDate = new Date(leaveForm.value.startDate)
   startDate.setHours(0, 0, 0, 0)
   return date < startDate
 }
 
-// 處理撤回申請
 const handleCancelRequest = async (leave) => {
   try {
     await ElMessageBox.confirm(
@@ -568,7 +579,10 @@ const handleCancelRequest = async (leave) => {
 
     await axios.post(`/api/leave/cancel/${leave._id}`)
     ElMessage.success('請假申請已撤回')
-    await fetchLeaveHistory()
+    await Promise.all([
+      fetchLeaveHistory(),
+      initializeData()
+    ])
   } catch (error) {
     if (error !== 'cancel') {
       console.error('撤回請假申請失敗:', error)
@@ -577,7 +591,6 @@ const handleCancelRequest = async (leave) => {
   }
 }
 
-// 更新請假時數
 const updateLeaveDuration = async () => {
   if (!leaveForm.value.startDate || !leaveForm.value.startTime ||
       !leaveForm.value.endDate || !leaveForm.value.endTime) {
@@ -603,7 +616,7 @@ const updateLeaveDuration = async () => {
   }
 }
 
-// 監聽表單變更以更新時數
+// 監聽表單變更
 watch(
     () => [
       leaveForm.value.startDate,
@@ -628,104 +641,133 @@ onMounted(async () => {
   height: 100%;
 }
 
-.leave-history-dialog {
-  min-width: 320px;
+.function-area {
+  padding: 1.25rem;
 }
 
-.function-content {
-  margin-bottom: 20px;
+.action-buttons {
+  margin-bottom: 1.5rem;
 }
 
-.leave-actions {
-  margin-bottom: 15px;
+.action-btn {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.leave-summary {
-  margin-top: 15px;
-  padding: 12px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
+.statistics-area {
+  margin-top: 1.5rem;
+}
+
+.stat-card {
+  background-color: #f8fafc;
+  border-radius: 8px;
+  padding: 1.25rem;
+  text-align: center;
+  transition: all 0.3s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.leave-summary p {
-  margin: 5px 0;
-  color: #606266;
-  font-size: 14px;
+.stat-title {
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
 }
 
-.leave-duration {
-  margin-top: 15px;
-  padding: 12px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
-  color: #606266;
+.stat-value {
+  color: #0f172a;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.form-select,
+.form-date-picker {
+  width: 100%;
+}
+
+.duration-info {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background-color: #f8fafc;
+  border-radius: 6px;
   text-align: center;
-  font-weight: bold;
-  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
 }
 
-.loading-placeholder {
-  padding: 10px;
+.history-dialog {
+  min-width: 320px;
 }
 
 .table-container {
-  width: 100%;
-  overflow-x: auto;
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
-:deep(.el-table) {
-  margin-top: 10px;
-  border-radius: 8px;
-  overflow: hidden;
+.info-icon {
+  margin-left: 4px;
+  color: #909399;
+  cursor: help;
+}
+
+.approval-info {
+  display: flex;
+  align-items: center;
+}
+
+.cancelled-text {
+  color: #909399;
+  font-size: 0.875rem;
 }
 
 .pagination-container {
-  margin-top: 20px;
-  padding-top: 15px;
+  margin-top: 1rem;
+  padding-top: 1rem;
   text-align: right;
-  border-top: 1px solid #ebeef5;
-}
-
-.text-gray {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  border-top: 1px solid #e5e7eb;
 }
 
 /* 響應式設計 */
 @media screen and (max-width: 768px) {
+  .function-area {
+    padding: 1rem;
+  }
+
+  .action-btn {
+    height: 36px;
+    font-size: 0.875rem;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+  }
+
   :deep(.el-table) {
-    font-size: 13px;
-  }
-
-  :deep(.el-button--small) {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-
-  :deep(.el-tag--small) {
-    padding: 0 6px;
-    font-size: 11px;
+    font-size: 0.875rem;
   }
 }
 
-/* 暗色主題適配 */
-:deep([class*='--dark']) {
-  .leave-summary,
-  .leave-duration {
-    background-color: #363637;
-    color: #e5eaf3;
+/* 暗色主題 */
+.is-dark {
+  .stat-card {
+    background-color: #334155;
   }
 
-  .text-gray {
-    color: #a3a6ad;
+  .stat-title {
+    color: #94a3b8;
+  }
+
+  .stat-value,
+  .duration-info {
+    color: #f1f5f9;
+  }
+
+  .duration-info {
+    background-color: #334155;
   }
 }
 </style>

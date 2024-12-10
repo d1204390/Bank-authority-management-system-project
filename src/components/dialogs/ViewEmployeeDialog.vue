@@ -126,7 +126,12 @@
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="handleClose" class="footer-btn">關閉</el-button>
-        <el-button type="primary" @click="handleEdit" class="footer-btn">編輯資料</el-button>
+        <el-button
+            v-if="showEditButton"
+            type="primary"
+            @click="handleEdit"
+            class="footer-btn"
+        >編輯資料</el-button>
       </div>
     </template>
   </el-dialog>
@@ -150,6 +155,10 @@ const props = defineProps({
   userData: {
     type: Object,
     required: true
+  },
+  showEditButton: {  // 新增這個 prop
+    type: Boolean,
+    default: true  // 預設顯示編輯按鈕
   }
 })
 

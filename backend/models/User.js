@@ -105,6 +105,11 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    lastActivityTime: {
+        type: Date,
+        default: null,
+        select: true  // 確保在查詢時預設會返回此欄位
+    },
     emergencyContact: {
         name: {
             type: String,
@@ -207,5 +212,11 @@ userSchema.set('toJSON', {
         return ret;
     }
 });
+
+// 添加檢查活動時間的方法
+userSchema.methods.isActive = function(timeout) {
+    if (!this.lastActivityTime) return false;
+    return (Date.now() - this.lastActivityTime.getTime()) <= timeout;
+};
 
 module.exports = mongoose.model('User', userSchema);

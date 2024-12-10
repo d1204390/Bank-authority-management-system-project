@@ -127,6 +127,11 @@ router.post('/login', async (req, res) => {
             }
         }
 
+        // 在登入成功後，更新最後登入時間
+        admin.lastLoginTime = new Date();
+        admin.lastActivityTime = new Date();  // 同時更新活動時間
+        await admin.save();
+
         // 創建 JWT
         const token = jwt.sign(
             {
@@ -138,7 +143,7 @@ router.post('/login', async (req, res) => {
                 position: 'ADMIN'          // 管理員職位標識
             },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: '24h' }
         );
 
         res.json({

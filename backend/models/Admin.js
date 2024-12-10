@@ -24,6 +24,15 @@ const adminSchema = new mongoose.Schema({
         type: String,
         required: true, // 如果希望是必填的話
         unique: true   // 如果希望 email 是唯一的話
+    },
+    lastActivityTime: {
+        type: Date,
+        default: null,
+        select: true
+    },
+    lastLoginTime: {
+        type: Date,
+        default: null
     }
 }, {
     timestamps: true

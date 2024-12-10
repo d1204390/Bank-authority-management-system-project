@@ -352,7 +352,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
-import ViewEmployeeDialog from '@/components/ViewEmployeeDialog.vue'
+import ViewEmployeeDialog from '@/components/dialogs/ViewEmployeeDialog.vue'
 import { ElLoading } from 'element-plus'
 
 // === 基礎狀態 ref 宣告 ===

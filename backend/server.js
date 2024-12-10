@@ -33,6 +33,10 @@ app.use('/api/user', userRoutes);
 const leaveRoutes = require('./routes/leave');
 app.use('/api/leave', leaveRoutes);
 
+// 新增新進員工路由
+const newEmployeeRoutes = require('./routes/newEmployeeRoutes');
+app.use('/api/new-employees', newEmployeeRoutes);
+
 // 啟動登入記錄清理服務
 loginHistoryCleanup.start();
 

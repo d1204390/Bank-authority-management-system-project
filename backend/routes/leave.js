@@ -214,23 +214,82 @@ router.get('/list', verifyToken, async (req, res) => {
         // 計算總數
         const count = await Leave.countDocuments(query);
 
-        // 獲取分頁數據
-        const leaves = await Leave.find(query)
-            .select('-__v')
-            .sort({ createdAt: -1 })
-            .skip((parseInt(page) - 1) * parseInt(limit))
-            .limit(parseInt(limit))
-            .lean();
+        // 使用 aggregate 獲取請假列表
+        const leaves = await Leave.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'users',
+                    let: { approverIds: '$approvalChain.approverEmployeeId' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $in: ['$employeeId', '$$approverIds']
+                                }
+                            }
+                        },
+                        {
+                            $project: {
+                                employeeId: 1,
+                                name: 1,
+                                _id: 0
+                            }
+                        }
+                    ],
+                    as: 'approvers'
+                }
+            },
+            {
+                $addFields: {
+                    approvalChain: {
+                        $map: {
+                            input: '$approvalChain',
+                            as: 'approval',
+                            in: {
+                                $mergeObjects: [
+                                    '$$approval',
+                                    {
+                                        approverName: {
+                                            $let: {
+                                                vars: {
+                                                    approver: {
+                                                        $arrayElemAt: [
+                                                            {
+                                                                $filter: {
+                                                                    input: '$approvers',
+                                                                    cond: { $eq: ['$$this.employeeId', '$$approval.approverEmployeeId'] }
+                                                                }
+                                                            },
+                                                            0
+                                                        ]
+                                                    }
+                                                },
+                                                in: '$$approver.name'
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            { $sort: { createdAt: -1 } },
+            { $skip: (parseInt(page) - 1) * parseInt(limit) },
+            { $limit: parseInt(limit) }
+        ]);
 
         // 格式化數據
         const formattedLeaves = leaves.map(leave => ({
             ...leave,
-            startDate: formatDateTime(leave.startDate),
-            endDate: formatDateTime(leave.endDate),
+            startDate: formatDateTime(new Date(leave.startDate)),
+            endDate: formatDateTime(new Date(leave.endDate)),
             formattedDuration: formatDuration(leave.duration),
-            createdAt: formatDateTime(leave.createdAt),
-            cancelledAt: leave.cancelledAt ? formatDateTime(leave.cancelledAt) : null,
-            // 格式化審核鏈資訊
+            createdAt: formatDateTime(new Date(leave.createdAt)),
+            cancelledAt: leave.cancelledAt ? formatDateTime(new Date(leave.cancelledAt)) : null,
+            updatedAt: leave.updatedAt ? formatDateTime(new Date(leave.updatedAt)) : null,
+            // 格式化審核鏈中的時間
             approvalChain: leave.approvalChain?.map(approval => ({
                 ...approval,
                 timestamp: formatDateTime(new Date(approval.timestamp))
@@ -270,10 +329,11 @@ router.get('/annual-leave/remaining', verifyToken, async (req, res) => {
         }
 
         const year = new Date().getFullYear();
+        const now = new Date();
         const startOfYear = new Date(year, 0, 1);
         const endOfYear = new Date(year, 11, 31, 23, 59, 59);
 
-        // 使用聚合查詢計算已使用的特休
+        // 使用聚合查詢計算已使用和已核准未開始的特休
         const result = await Leave.aggregate([
             {
                 $match: {
@@ -287,35 +347,50 @@ router.get('/annual-leave/remaining', verifyToken, async (req, res) => {
                 }
             },
             {
+                $project: {
+                    duration: 1,
+                    isPending: { $gt: ['$startDate', now] }
+                }
+            },
+            {
                 $group: {
                     _id: null,
-                    totalUsedHours: { $sum: '$duration' }
+                    totalUsedHours: {
+                        $sum: {
+                            $cond: [
+                                { $lte: ['$startDate', now] },
+                                '$duration',
+                                0
+                            ]
+                        }
+                    },
+                    totalPendingHours: {
+                        $sum: {
+                            $cond: [
+                                { $gt: ['$startDate', now] },
+                                '$duration',
+                                0
+                            ]
+                        }
+                    }
                 }
             }
         ]);
 
         const totalAnnualLeave = 14; // 年度總特休天數
         const usedHours = result[0]?.totalUsedHours || 0;
+        const pendingHours = result[0]?.totalPendingHours || 0;
         const usedDays = usedHours / 8;
-        const remainingDays = totalAnnualLeave - usedDays;
+        const pendingDays = pendingHours / 8;
+        const remainingDays = totalAnnualLeave - usedDays - pendingDays;
 
         const responseData = {
             remainingDays: Math.round(remainingDays * 100) / 100,
             usedDays: Math.round(usedDays * 100) / 100,
+            pendingDays: Math.round(pendingDays * 100) / 100,
             totalDays: totalAnnualLeave,
             year
         };
-
-        // 設置快取標頭
-        const etag = require('crypto')
-            .createHash('md5')
-            .update(JSON.stringify(responseData))
-            .digest('hex');
-
-        res.set({
-            'Cache-Control': 'private, max-age=300',
-            'ETag': etag
-        });
 
         res.json(responseData);
 
@@ -418,7 +493,13 @@ router.get('/pending-approvals', verifyToken, supervisorAuth, async (req, res) =
  */
 router.get('/department-history', verifyToken, supervisorAuth, async (req, res) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const {
+            page = 1,
+            limit = 10,
+            employeeName,  // 新增：姓名篩選
+            leaveType,     // 新增：假別篩選
+            status        // 新增：狀態篩選
+        } = req.query;
 
         const user = await User.findById(req.user.id)
             .select('employeeId department')
@@ -428,15 +509,17 @@ router.get('/department-history', verifyToken, supervisorAuth, async (req, res) 
             return res.status(404).json({ msg: '找不到用戶信息' });
         }
 
-        // 構建查詢條件：
-        // 1. 只查看自己部門的請假記錄
-        const query = {
+        // 構建 MongoDB 查詢條件
+        const baseQuery = {
             department: user.department
         };
 
-        // 計算總數（需要在 aggregate 後計算，因為要過濾職位）
-        const totalResult = await Leave.aggregate([
-            { $match: query },
+        // 新增：根據篩選條件動態添加查詢條件
+        const aggregatePipeline = [
+            // 第一步：基本條件匹配
+            { $match: baseQuery },
+
+            // 第二步：關聯用戶表獲取員工資訊
             {
                 $lookup: {
                     from: 'users',
@@ -446,27 +529,53 @@ router.get('/department-history', verifyToken, supervisorAuth, async (req, res) 
                 }
             },
             { $unwind: '$employee' },
-            // 只獲取科員(C)的請假記錄
-            { $match: { 'employee.position': 'C' } },
-            { $count: 'total' }
-        ]);
 
+            // 第三步：只獲取科員(C)的請假記錄
+            { $match: { 'employee.position': 'C' } }
+        ];
+
+        // 新增：姓名篩選
+        if (employeeName) {
+            aggregatePipeline.push({
+                $match: {
+                    'employee.name': {
+                        $regex: employeeName,
+                        $options: 'i'  // 不區分大小寫
+                    }
+                }
+            });
+        }
+
+        // 新增：假別篩選
+        if (leaveType) {
+            aggregatePipeline.push({
+                $match: { leaveType }
+            });
+        }
+
+        // 新增：狀態篩選
+        if (status) {
+            aggregatePipeline.push({
+                $match: { status }
+            });
+        }
+
+        // 計算總數
+        const countPipeline = [...aggregatePipeline];
+        countPipeline.push({ $count: 'total' });
+        const totalResult = await Leave.aggregate(countPipeline);
         const total = totalResult[0]?.total || 0;
 
-        // 獲取部門請假歷史
-        const leaves = await Leave.aggregate([
-            { $match: query },
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'employeeId',
-                    foreignField: 'employeeId',
-                    as: 'employee'
-                }
-            },
-            { $unwind: '$employee' },
-            // 只獲取科員(C)的請假記錄
-            { $match: { 'employee.position': 'C' } },
+        // 添加分頁和投影
+        aggregatePipeline.push(
+            // 排序
+            { $sort: { createdAt: -1 } },
+
+            // 分頁
+            { $skip: (parseInt(page) - 1) * parseInt(limit) },
+            { $limit: parseInt(limit) },
+
+            // 投影：選擇要返回的欄位
             {
                 $project: {
                     _id: 1,
@@ -482,11 +591,11 @@ router.get('/department-history', verifyToken, supervisorAuth, async (req, res) 
                     cancelledAt: 1,
                     approvalChain: 1
                 }
-            },
-            { $sort: { createdAt: -1 } },
-            { $skip: (parseInt(page) - 1) * parseInt(limit) },
-            { $limit: parseInt(limit) }
-        ]);
+            }
+        );
+
+        // 執行查詢
+        const leaves = await Leave.aggregate(aggregatePipeline);
 
         // 格式化數據
         const formattedLeaves = leaves.map(leave => ({

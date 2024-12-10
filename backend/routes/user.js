@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const User = require('../models/User');
+const { verifyToken } = require('../middleware/authMiddleware');
 const LoginAttempt = require('../models/LoginAttempt');
 const LoginHistory = require('../models/LoginHistory');
 const { sendLockAccountEmail, sendAccountCredentials, generateVerificationCode } = require('../utils/emailService');
@@ -116,7 +117,7 @@ const generateToken = (user, department, position) => {
         department,
         position,
         role: 'user',
-        exp: Math.floor(Date.now() / 1000) + (60 * 60)
+        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
     };
 
     return jwt.sign(
@@ -312,6 +313,7 @@ router.post('/login', async (req, res) => {
 
         // 更新最後登入時間
         user.lastLoginTime = new Date();
+        user.lastActivityTime = new Date();
         await user.save();
 
         // 生成 token 並返回
@@ -829,4 +831,65 @@ router.post('/verify-unlock', async (req, res) => {
     }
 });
 
+// 獲取部門員工列表（主管權限）
+router.get('/department-employees', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ msg: '找不到用戶資料' });
+        }
+
+        // 確認是否為主管職位（M 或 S）
+        if (!['M', 'S'].includes(user.position)) {
+            return res.status(403).json({ msg: '權限不足' });
+        }
+
+        // 查詢同部門的員工，移除 $ne 條件，包含當前用戶
+        const departmentEmployees = await User.find(
+            {
+                department: user.department
+            },
+            '-password -verificationCode'
+        ).select('+employeeId');
+
+        res.json(departmentEmployees);
+
+    } catch (error) {
+        console.error('獲取部門員工列表失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+// 獲取所有部門員工列表（主管權限）
+router.get('/all-department-employees', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ msg: '找不到用戶資料' });
+        }
+
+        // 確認是否為主管職位（M 或 S）
+        if (!['M', 'S'].includes(user.position)) {
+            return res.status(403).json({ msg: '權限不足' });
+        }
+
+        // 查詢所有部門的員工資料
+        const allEmployees = await User.find(
+            {},  // 空對象表示不加任何過濾條件
+            '-password -verificationCode'  // 排除敏感資料
+        ).select('+employeeId');
+
+        // 添加 isCurrent 標記，用於標識當前用戶
+        const employeesWithCurrentFlag = allEmployees.map(emp => ({
+            ...emp.toObject(),
+            isCurrent: emp._id.toString() === user._id.toString()
+        }));
+
+        res.json(employeesWithCurrentFlag);
+
+    } catch (error) {
+        console.error('獲取所有部門員工列表失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
 module.exports = router;

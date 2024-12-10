@@ -2,7 +2,26 @@
   <div class="leave-management-container">
     <!-- 頁籤切換 -->
     <el-tabs v-model="activeTab" class="leave-tabs">
-      <el-tab-pane label="待審核申請" name="pending">
+      <el-tab-pane label="日曆視圖" name="calendar">
+        <LeaveCalendar
+            @switchToApproval="handleSwitchToApproval"
+            ref="leaveCalendar"
+        />
+      </el-tab-pane>
+
+      <el-tab-pane name="pending">
+        <template #label>
+          <span class="tab-label">
+            待審核申請
+            <el-badge
+                v-if="pendingCount"
+                :value="pendingCount"
+                class="pending-badge"
+                :max="99"
+            />
+          </span>
+        </template>
+
         <el-card class="approval-list" v-loading="loading">
           <!-- 待審核列表 -->
           <div class="table-container">
@@ -10,6 +29,8 @@
                 :data="pendingRequests"
                 style="width: 100%"
                 :default-sort="{ prop: 'createdAt', order: 'descending' }"
+                highlight-current-row
+                :row-class-name="getRowClassName"
             >
               <el-table-column
                   prop="employeeName"
@@ -103,91 +124,10 @@
       </el-tab-pane>
 
       <el-tab-pane label="部門請假紀錄" name="department">
-        <el-card class="department-history">
-          <!-- 部門請假紀錄表格 -->
-          <div class="table-container">
-            <el-table
-                :data="departmentHistory"
-                style="width: 100%"
-                :default-sort="{ prop: 'createdAt', order: 'descending' }"
-            >
-              <el-table-column
-                  prop="employeeName"
-                  label="申請人"
-                  width="120"
-                  fixed="left"
-              />
-              <el-table-column
-                  prop="createdAt"
-                  label="申請時間"
-                  width="160"
-                  fixed="left"
-              />
-              <el-table-column
-                  prop="startDate"
-                  label="開始時間"
-                  width="160"
-              />
-              <el-table-column
-                  prop="endDate"
-                  label="結束時間"
-                  width="160"
-              />
-              <el-table-column
-                  prop="leaveType"
-                  label="假別"
-                  width="100"
-              >
-                <template #default="scope">
-                  {{ getLeaveTypeText(scope.row.leaveType) }}
-                </template>
-              </el-table-column>
-              <el-table-column
-                  prop="duration"
-                  label="時數"
-                  width="100"
-                  align="center"
-              >
-                <template #default="scope">
-                  {{ scope.row.formattedDuration }}
-                </template>
-              </el-table-column>
-              <el-table-column
-                  prop="status"
-                  label="狀態"
-                  width="100"
-                  align="center"
-              >
-                <template #default="scope">
-                  <el-tag :type="getStatusType(scope.row.status)">
-                    {{ getStatusText(scope.row.status) }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column
-                  prop="reason"
-                  label="請假原因"
-                  min-width="200"
-                  show-overflow-tooltip
-              />
-            </el-table>
-          </div>
-
-          <!-- 分頁控制 -->
-          <div class="pagination-container" v-if="departmentHistory.length">
-            <el-pagination
-                v-model:current-page="departmentCurrentPage"
-                v-model:page-size="departmentPageSize"
-                :total="departmentTotal"
-                @current-change="handleDepartmentPageChange"
-                layout="total, prev, pager, next"
-            />
-          </div>
-        </el-card>
+        <DepartmentHistory />
       </el-tab-pane>
 
-      <el-tab-pane label="個人請假管理" name="personal">
-        <!-- 引用個人請假管理組件 -->
+      <el-tab-pane label="個人請假申請" name="personal">
         <LeaveApplication />
       </el-tab-pane>
     </el-tabs>
@@ -197,6 +137,7 @@
         v-model="rejectDialog.visible"
         title="請輸入駁回原因"
         width="500px"
+        destroy-on-close
     >
       <el-form
           ref="rejectFormRef"
@@ -226,24 +167,29 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox,  } from 'element-plus'
+import { ref, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox, ElBadge } from 'element-plus'
 import axios from 'axios'
 import LeaveApplication from './LeaveApplication.vue'
+import LeaveCalendar from "@/components/leave/FullCalendarLeave.vue"
+import DepartmentHistory from './DepartmentHistory.vue'
 
 // 頁面狀態
-const activeTab = ref('pending')
+const activeTab = ref('calendar')
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const pendingRequests = ref([])
+const pendingCount = ref(0)
+const leaveCalendar = ref(null)
 
-// 部門歷史記錄狀態
-const departmentCurrentPage = ref(1)
-const departmentPageSize = ref(10)
-const departmentTotal = ref(0)
-const departmentHistory = ref([])
+// 監聽 activeTab 變化
+watch(activeTab, async (newTab, oldTab) => {
+  if (newTab === 'calendar' && oldTab !== 'calendar' && leaveCalendar.value) {
+    await leaveCalendar.value.refreshCalendar()
+  }
+})
 
 // 駁回對話框
 const rejectDialog = ref({
@@ -260,13 +206,30 @@ const rejectDialog = ref({
   }
 })
 const rejectFormRef = ref(null)
+const highlightLeaveId = ref(null)
+
+// 處理從日曆跳轉到審核頁面
+const handleSwitchToApproval = async (leaveId) => {
+  activeTab.value = 'pending'
+  await fetchPendingRequests()
+  highlightLeaveId.value = leaveId
+
+  setTimeout(() => {
+    highlightLeaveId.value = null
+  }, 3000)
+}
+
+// 獲取行的類名
+const getRowClassName = ({ row }) => {
+  if (highlightLeaveId.value && row._id === highlightLeaveId.value) {
+    return 'highlight-row'
+  }
+  return ''
+}
 
 // 初始化數據
 const initializeData = async () => {
-  await Promise.all([
-    fetchPendingRequests(),
-    fetchDepartmentHistory()
-  ])
+  await fetchPendingRequests()
 }
 
 // 獲取待審核申請
@@ -282,29 +245,12 @@ const fetchPendingRequests = async () => {
 
     pendingRequests.value = response.data.leaves
     total.value = response.data.pagination.total
+    pendingCount.value = response.data.pagination.total
   } catch (error) {
     console.error('獲取待審核申請失敗:', error)
     ElMessage.error('獲取待審核申請失敗，請稍後再試')
   } finally {
     loading.value = false
-  }
-}
-
-// 獲取部門請假歷史
-const fetchDepartmentHistory = async () => {
-  try {
-    const response = await axios.get('/api/leave/department-history', {
-      params: {
-        page: departmentCurrentPage.value,
-        limit: departmentPageSize.value
-      }
-    })
-
-    departmentHistory.value = response.data.leaves
-    departmentTotal.value = response.data.pagination.total
-  } catch (error) {
-    console.error('獲取部門請假歷史失敗:', error)
-    ElMessage.error('獲取部門請假歷史失敗，請稍後再試')
   }
 }
 
@@ -323,12 +269,15 @@ const handleApprove = async (leave) => {
 
     await axios.post(`/api/leave/approve/${leave._id}`, {
       status: 'approved',
-      comment: '同意請假申請'  // 可以根據需求修改預設的核准評語
+      comment: '同意請假申請'
     })
 
     ElMessage.success('已核准請假申請')
     await fetchPendingRequests()
-    await fetchDepartmentHistory()
+
+    if (leaveCalendar.value) {
+      await leaveCalendar.value.refreshCalendar()
+    }
   } catch (error) {
     if (error !== 'cancel') {
       console.error('核准請假申請失敗:', error)
@@ -360,7 +309,10 @@ const submitReject = async () => {
     ElMessage.success('已駁回請假申請')
     rejectDialog.value.visible = false
     await fetchPendingRequests()
-    await fetchDepartmentHistory()
+
+    if (leaveCalendar.value) {
+      await leaveCalendar.value.refreshCalendar()
+    }
   } catch (error) {
     console.error('駁回請假申請失敗:', error)
     ElMessage.error('駁回失敗，請稍後再試')
@@ -371,11 +323,6 @@ const submitReject = async () => {
 const handlePageChange = (page) => {
   currentPage.value = page
   fetchPendingRequests()
-}
-
-const handleDepartmentPageChange = (page) => {
-  departmentCurrentPage.value = page
-  fetchDepartmentHistory()
 }
 
 // 工具函數
@@ -391,26 +338,6 @@ const getLeaveTypeText = (type) => {
   return types[type] || type
 }
 
-const getStatusText = (status) => {
-  const statusMap = {
-    pending: '待審核',
-    approved: '已核准',
-    rejected: '已駁回',
-    cancelled: '已撤回'
-  }
-  return statusMap[status] || status
-}
-
-const getStatusType = (status) => {
-  const typeMap = {
-    pending: 'warning',
-    approved: 'success',
-    rejected: 'danger',
-    cancelled: 'info'
-  }
-  return typeMap[status] || ''
-}
-
 // 組件掛載時初始化
 onMounted(() => {
   initializeData()
@@ -424,7 +351,7 @@ onMounted(() => {
   background: #f5f7fa;
 }
 
-/* 頁籤容器樣式 */
+/* Tab 相關樣式 */
 .leave-tabs {
   height: 100%;
   background: #ffffff;
@@ -433,7 +360,6 @@ onMounted(() => {
   padding: 16px 20px;
 }
 
-/* 頁籤header樣式 */
 :deep(.el-tabs__header) {
   margin: 0 0 20px 0;
   border-bottom: none;
@@ -446,7 +372,6 @@ onMounted(() => {
   opacity: 0.6;
 }
 
-/* 頁籤項目樣式 */
 :deep(.el-tabs__item) {
   height: 48px;
   line-height: 48px;
@@ -457,35 +382,46 @@ onMounted(() => {
   border-radius: 4px 4px 0 0;
 }
 
-/* 頁籤hover效果 */
 :deep(.el-tabs__item:hover) {
   color: var(--el-color-primary);
 }
 
-/* 當前選中頁籤樣式 */
 :deep(.el-tabs__item.is-active) {
   color: var(--el-color-primary);
   font-weight: 600;
   background: rgba(64, 158, 255, 0.1);
 }
 
-/* 頁籤內容區域 */
 :deep(.el-tabs__content) {
   height: calc(100% - 55px);
   overflow: auto;
   padding: 0 4px;
 }
 
-/* 表格卡片樣式 */
-.approval-list,
-.department-history {
+/* 待審核標籤樣式 */
+.tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.pending-badge {
+  transform: translateY(-2px);
+}
+
+:deep(.el-badge__content) {
+  box-shadow: 0 0 0 1px #fff;
+}
+
+/* 表格相關樣式 */
+.approval-list {
   margin-top: 0;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   border: 1px solid #ebeef5;
 }
 
-/* 表格容器樣式 */
 .table-container {
   width: 100%;
   overflow-x: auto;
@@ -503,7 +439,7 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* 分頁容器樣式 */
+/* 分頁樣式 */
 .pagination-container {
   margin-top: 20px;
   padding: 15px 20px;
@@ -512,11 +448,24 @@ onMounted(() => {
   background: #fff;
 }
 
-/* 按鈕組樣式 */
 :deep(.el-button--small) {
   padding: 8px 16px;
   border-radius: 4px;
   transition: all 0.3s ease;
+}
+
+/* 高亮效果 */
+:deep(.highlight-row) {
+  animation: highlight-animation 3s ease-out;
+}
+
+@keyframes highlight-animation {
+  0%, 20% {
+    background-color: var(--el-color-primary-light-8);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 /* 暗色主題適配 */
@@ -534,8 +483,7 @@ onMounted(() => {
     color: #a3a6ad;
   }
 
-  .approval-list,
-  .department-history {
+  .approval-list {
     border-color: #363637;
   }
 
@@ -546,6 +494,157 @@ onMounted(() => {
   .pagination-container {
     background: #141414;
     border-color: #363637;
+  }
+
+  .el-badge__content {
+    box-shadow: 0 0 0 1px #141414;
+  }
+}
+
+/* 對話框樣式 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+}
+
+:deep(.el-dialog) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-dialog__header) {
+  margin: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+:deep(.el-dialog__title) {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+:deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 12px 24px 24px;
+  border-top: none;
+}
+
+/* 表單樣式 */
+:deep(.el-form-item__content) {
+  flex-wrap: nowrap;
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-textarea__inner) {
+  box-shadow: 0 0 0 1px #dcdfe6;
+}
+
+:deep(.el-input__wrapper:hover),
+:deep(.el-textarea__inner:hover) {
+  box-shadow: 0 0 0 1px var(--el-border-color-hover);
+}
+
+:deep(.el-input__wrapper.is-focus),
+:deep(.el-textarea__inner:focus) {
+  box-shadow: 0 0 0 1px var(--el-color-primary);
+}
+
+/* Loading 樣式 */
+:deep(.el-loading-mask) {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(2px);
+}
+
+/* Empty 狀態樣式 */
+:deep(.el-empty) {
+  padding: 40px 0;
+}
+
+:deep(.el-empty__description) {
+  margin-top: 16px;
+  color: var(--el-text-color-secondary);
+}
+
+/* 響應式設計 */
+@media screen and (max-width: 768px) {
+  .leave-management-container {
+    padding: 12px;
+  }
+
+  .leave-tabs {
+    padding: 12px;
+  }
+
+  :deep(.el-tabs__item) {
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  .table-container {
+    padding: 0;
+  }
+
+  :deep(.el-table) {
+    font-size: 13px;
+  }
+
+  :deep(.el-button--small) {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .pagination-container {
+    padding: 12px;
+  }
+
+  :deep(.el-dialog) {
+    width: 90% !important;
+    margin: 0 auto;
+  }
+}
+
+/* 動畫效果 */
+.el-tab-pane {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 暗色主題額外適配 */
+:deep([class*='--dark']) {
+  .el-loading-mask {
+    background-color: rgba(0, 0, 0, 0.8);
+  }
+
+  :deep(.el-input__wrapper),
+  :deep(.el-textarea__inner) {
+    box-shadow: 0 0 0 1px #4c4d4f;
+  }
+
+  :deep(.el-dialog) {
+    background: #1a1a1a;
+  }
+
+  :deep(.el-dialog__header) {
+    border-bottom-color: #363637;
+  }
+
+  :deep(.el-empty__description) {
+    color: #909399;
   }
 }
 </style>
