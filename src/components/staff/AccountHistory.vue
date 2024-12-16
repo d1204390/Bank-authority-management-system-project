@@ -52,7 +52,7 @@
       <el-table-column prop="email" label="Email" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column
           prop="accountCreatedAt"
-          label="建立時間"
+          label="帳號建立時間"
           width="160"
           align="center"
       >
@@ -110,7 +110,6 @@
           <el-descriptions-item label="建立時間">
             {{ formatDateTime(null, currentRecord.accountCreatedAt) }}
           </el-descriptions-item>
-          <el-descriptions-item label="建立者">{{ currentRecord.createdByName || '-' }}</el-descriptions-item>
         </el-descriptions>
 
         <div class="approval-info" v-if="currentRecord.approvalChain?.length">

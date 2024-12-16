@@ -172,7 +172,6 @@
       </el-tabs>
     </div>
 
-
     <!-- 詳情對話框 -->
     <el-dialog
         v-model="detailDialogVisible"
@@ -182,13 +181,20 @@
       <template v-if="currentEmployee">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="姓名">{{ currentEmployee.name }}</el-descriptions-item>
-          <el-descriptions-item label="部門">{{ currentEmployee.department }}</el-descriptions-item>
-          <el-descriptions-item label="職位">{{ currentEmployee.position }}</el-descriptions-item>
+          <el-descriptions-item label="部門">{{ convertDepartment(currentEmployee.department) }}</el-descriptions-item>
+          <el-descriptions-item label="職位">{{ convertPosition(currentEmployee.position) }}</el-descriptions-item>
           <el-descriptions-item label="Email">{{ currentEmployee.email }}</el-descriptions-item>
-          <el-descriptions-item label="到職日期">{{ currentEmployee.startDate }}</el-descriptions-item>
+          <el-descriptions-item label="到職日期">{{ formatDate(currentEmployee.startDate) }}</el-descriptions-item>
           <el-descriptions-item label="提交主管">{{ currentEmployee.submitter?.name }}</el-descriptions-item>
-          <el-descriptions-item label="提交時間" :span="2">
-            {{ currentEmployee.createdAt }}
+          <el-descriptions-item label="提交時間">{{ formatDate(currentEmployee.submittedAt) }}</el-descriptions-item>
+          <el-descriptions-item label="審核狀態">
+            <el-tag
+                :type="currentEmployee.status === 'approved' ? 'success' :
+                           currentEmployee.status === 'rejected' ? 'danger' : 'warning'"
+            >
+              {{ currentEmployee.status === 'approved' ? '已核准' :
+                currentEmployee.status === 'rejected' ? '已駁回' : '待審核' }}
+            </el-tag>
           </el-descriptions-item>
         </el-descriptions>
 
@@ -198,17 +204,32 @@
             <el-timeline-item
                 v-for="(approval, index) in currentEmployee.approvalChain"
                 :key="index"
-                type="success"
+                :type="approval.status === 'approved' ? 'success' : 'danger'"
             >
-              <h4>{{ approval.approverName }}</h4>
-              <p>審核意見：{{ approval.comment }}</p>
-              <p>審核時間：{{ approval.timestamp }}</p>
+              <div class="approval-content">
+                <h4>{{ approval.approverName }}
+                  <el-tag
+                      size="small"
+                      :type="approval.status === 'approved' ? 'success' : 'danger'"
+                      class="ml-2"
+                  >
+                    {{ approval.status === 'approved' ? '核准' : '駁回' }}
+                  </el-tag>
+                </h4>
+                <p class="approval-comment">
+                  <span class="comment-label">審核意見：</span>
+                  {{ approval.comment || '無' }}
+                </p>
+                <p class="approval-time">
+                  <span class="time-label">審核時間：</span>
+                  {{ formatDate(approval.timestamp) }}
+                </p>
+              </div>
             </el-timeline-item>
           </el-timeline>
         </div>
       </template>
     </el-dialog>
-
     <!-- 批量建立帳號對話框 -->
     <el-dialog
         v-model="batchDialogVisible"
@@ -944,6 +965,59 @@ onMounted(() => {
 .progress-status p {
   margin: 0;
   color: #606266;
+}
+
+/* 詳情對話框樣式 */
+.approval-info {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.approval-info h4 {
+  margin-bottom: 16px;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.approval-content {
+  h4 {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .approval-comment, .approval-time {
+    margin: 8px 0;
+    color: var(--el-text-color-regular);
+    font-size: 14px;
+
+    .comment-label, .time-label {
+      color: var(--el-text-color-secondary);
+      display: inline-block;
+      width: 80px;
+    }
+  }
+}
+
+:deep(.el-timeline-item__node) {
+  width: 12px;
+  height: 12px;
+}
+
+:deep(.el-timeline-item__wrapper) {
+  padding-left: 28px;
+}
+
+:deep(.el-descriptions) {
+  padding: 16px;
+  margin-bottom: 0;
+}
+
+:deep(.el-descriptions__cell) {
+  padding: 12px;
 }
 
 :deep(.el-progress-bar__inner) {
