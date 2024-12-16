@@ -68,7 +68,22 @@
         </el-table-column>
         <el-table-column label="狀態" width="100">
           <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
+            <el-tooltip
+                v-if="scope.row.status === 'rejected' &&
+            scope.row.approvalChain &&
+            scope.row.approvalChain[0]?.comment"
+                :content="scope.row.approvalChain[0].comment"
+                placement="top"
+                effect="dark"
+            >
+              <el-tag type="danger">
+                {{ getStatusLabel(scope.row.status) }}
+              </el-tag>
+            </el-tooltip>
+            <el-tag
+                v-else
+                :type="getStatusType(scope.row.status)"
+            >
               {{ getStatusLabel(scope.row.status) }}
             </el-tag>
           </template>

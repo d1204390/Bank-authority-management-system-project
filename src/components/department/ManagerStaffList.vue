@@ -17,7 +17,9 @@
         <el-button
             type="primary"
             @click="handleReviewApplications"
+            :disabled="loadingNewEmployees"
         >
+          <el-icon><Document /></el-icon>
           審核申請
           <el-badge
               v-if="pendingApplicationsCount"
@@ -39,10 +41,12 @@
         </el-table-column>
         <el-table-column prop="extension" label="分機" width="120" />
         <el-table-column prop="email" label="電子郵件" min-width="200" />
-        <el-table-column fixed="right" label="操作" width="120">
+        <el-table-column fixed="right" label="操作" width="120" align="center">
           <template #default="{ row }">
             <el-button
+                type="primary"
                 size="small"
+                plain
                 @click="handleViewDetails(row)"
             >
               詳情
@@ -58,12 +62,41 @@
         title="待審核新進員工申請"
         width="80%"
         destroy-on-close
+        class="review-dialog"
     >
+      <div class="review-controls">
+        <div class="selection-info">
+          <span v-if="selectedApplications.length > 0">
+            已選擇 {{ selectedApplications.length }} 筆申請
+          </span>
+        </div>
+        <div class="batch-actions" v-if="selectedApplications.length > 0">
+          <el-button
+              type="success"
+              @click="handleBatchApprove"
+              :loading="submittingApproval"
+          >
+            <el-icon><Check /></el-icon>
+            批量核准
+          </el-button>
+          <el-button
+              type="danger"
+              @click="openBatchRejectDialog"
+              :loading="submittingApproval"
+          >
+            <el-icon><Close /></el-icon>
+            批量駁回
+          </el-button>
+        </div>
+      </div>
+
       <el-table
           :data="newEmployeesList"
           style="width: 100%"
           v-loading="loadingNewEmployees"
+          @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column prop="name" label="姓名" width="120" />
         <el-table-column prop="email" label="電子郵件" min-width="180" />
         <el-table-column label="到職日期" width="120">
@@ -88,23 +121,27 @@
             {{ formatDateTime(row.submittedAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <el-button-group v-if="row.status === 'pending'">
-              <el-button
-                  size="small"
-                  type="success"
-                  @click="openApprovalDialog(row, 'approved')"
-              >
-                核准
-              </el-button>
-              <el-button
-                  size="small"
-                  type="danger"
-                  @click="openApprovalDialog(row, 'rejected')"
-              >
-                駁回
-              </el-button>
+              <el-tooltip content="核准" placement="top">
+                <el-button
+                    size="small"
+                    type="success"
+                    :icon="Check"
+                    circle
+                    @click="handleSingleApprove(row)"
+                />
+              </el-tooltip>
+              <el-tooltip content="駁回" placement="top">
+                <el-button
+                    size="small"
+                    type="danger"
+                    :icon="Close"
+                    circle
+                    @click="openRejectDialog(row)"
+                />
+              </el-tooltip>
             </el-button-group>
           </template>
         </el-table-column>
@@ -123,37 +160,43 @@
       </template>
     </el-dialog>
 
-    <!-- 審核表單對話框 -->
+    <!-- 駁回原因對話框 -->
     <el-dialog
-        v-model="approvalDialogVisible"
-        :title="approvalForm.status === 'approved' ? '核准申請' : '駁回申請'"
+        v-model="rejectDialogVisible"
+        :title="isMultipleReject ? '批量駁回申請' : '駁回申請'"
         width="500px"
         destroy-on-close
+        class="reject-dialog"
     >
+      <div v-if="isMultipleReject" class="reject-info">
+        已選擇 {{ selectedApplications.length }} 筆申請進行駁回
+      </div>
+
       <el-form
-          ref="approvalFormRef"
-          :model="approvalForm"
-          :rules="approvalRules"
+          ref="rejectFormRef"
+          :model="rejectForm"
+          :rules="rejectRules"
           label-width="80px"
       >
-        <el-form-item label="備註" prop="comment">
+        <el-form-item label="駁回原因" prop="reason">
           <el-input
-              v-model="approvalForm.comment"
+              v-model="rejectForm.reason"
               type="textarea"
               :rows="4"
-              :placeholder="approvalForm.status === 'approved' ? '請輸入核准備註' : '請輸入駁回原因'"
+              placeholder="請輸入駁回原因"
           />
         </el-form-item>
       </el-form>
+
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="approvalDialogVisible = false">取消</el-button>
+          <el-button @click="rejectDialogVisible = false">取消</el-button>
           <el-button
-              type="primary"
+              type="danger"
               :loading="submittingApproval"
-              @click="handleApproval"
+              @click="handleReject"
           >
-            確認
+            確認駁回
           </el-button>
         </span>
       </template>
@@ -169,11 +212,10 @@
 </template>
 
 <script setup>
-// script setup 部分
-import { ref, computed, inject, onMounted,defineProps } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { ref, computed, inject, onMounted, defineProps } from 'vue'
+import { Search, Document, Check, Close } from '@element-plus/icons-vue'
 import ViewEmployeeDialog from '@/components/staff/ViewEmployeeDialog.vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 
 // 注入和 Props 定義
@@ -194,29 +236,27 @@ const searchQuery = ref('')
 const dialogVisible = ref(false)
 const currentStaff = ref(null)
 const reviewDialogVisible = ref(false)
-const approvalDialogVisible = ref(false)
+const rejectDialogVisible = ref(false)
 const loadingNewEmployees = ref(false)
 const submittingApproval = ref(false)
 const newEmployeesList = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const totalApplications = ref(0)
-const currentApprovalData = ref(null)
+const selectedApplications = ref([])
+const isMultipleReject = ref(false)
+const currentRejectTarget = ref(null)
 
 // 表單相關
-const approvalFormRef = ref(null)
-const approvalForm = ref({
-  status: '',
-  comment: ''
+const rejectFormRef = ref(null)
+const rejectForm = ref({
+  reason: ''
 })
 
-const approvalRules = {
-  comment: [
-    { required: true, message: '請輸入備註', trigger: 'blur' },
-    { min: 2, message: '備註長度至少為 2 個字元', trigger: 'blur' }
-  ],
-  status: [
-    { required: true, message: '狀態是必要的', trigger: 'blur' }
+const rejectRules = {
+  reason: [
+    { required: true, message: '請輸入駁回原因', trigger: 'blur' },
+    { min: 2, message: '原因長度至少為 2 個字元', trigger: 'blur' }
   ]
 }
 
@@ -262,41 +302,129 @@ const fetchNewEmployees = async () => {
   }
 }
 
-const submitApproval = async (formRef) => {
-  if (!formRef) return false
-
+const processApproval = async (id, status, comment = '') => {
   try {
-    await formRef.validate()
+    await axios.post(`/api/new-employees/approve/${id}`, {
+      status,
+      comment: comment || '核准通過'
+    })
     return true
   } catch (error) {
+    console.error('處理審核失敗:', error)
+    ElMessage.error(error.response?.data?.msg || '處理失敗，請稍後再試')
     return false
   }
 }
 
 // 事件處理函數
-const handleApproval = async () => {
-  try {
-    if (!currentApprovalData.value?._id) {
-      ElMessage.error('無效的申請資料')
-      return
-    }
+const handleSelectionChange = (selection) => {
+  selectedApplications.value = selection
+}
 
-    const isValid = await submitApproval(approvalFormRef.value)
-    if (!isValid) return
+const handleSingleApprove = async (row) => {
+  submittingApproval.value = true
+  try {
+    const success = await processApproval(row._id, 'approved')
+    if (success) {
+      ElMessage.success('已核准申請')
+      await fetchNewEmployees()
+    }
+  } finally {
+    submittingApproval.value = false
+  }
+}
+
+const handleBatchApprove = async () => {
+  if (selectedApplications.value.length === 0) {
+    ElMessage.warning('請選擇要核准的申請')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+        `確定要核准所選的 ${selectedApplications.value.length} 筆申請？`,
+        '確認核准',
+        {
+          confirmButtonText: '確定',
+          cancelButtonText: '取消',
+          type: 'success'
+        }
+    )
 
     submittingApproval.value = true
+    let successCount = 0
 
-    await axios.post(`/api/new-employees/approve/${currentApprovalData.value._id}`, {
-      status: approvalForm.value.status,
-      comment: approvalForm.value.comment
-    })
+    for (const app of selectedApplications.value) {
+      const success = await processApproval(app._id, 'approved')
+      if (success) successCount++
+    }
 
-    ElMessage.success(`申請已${approvalForm.value.status === 'approved' ? '核准' : '駁回'}`)
-    approvalDialogVisible.value = false
-    await fetchNewEmployees()
+    if (successCount > 0) {
+      ElMessage.success(`成功核准 ${successCount} 筆申請`)
+      await fetchNewEmployees()
+    }
   } catch (error) {
-    console.error('審核處理失敗:', error)
-    ElMessage.error(error.response?.data?.msg || '審核處理失敗，請稍後再試')
+    if (error !== 'cancel') {
+      console.error('批量核准失敗:', error)
+    }
+  } finally {
+    submittingApproval.value = false
+  }
+}
+
+const openRejectDialog = (row) => {
+  isMultipleReject.value = false
+  currentRejectTarget.value = row
+  rejectForm.value.reason = ''
+  rejectDialogVisible.value = true
+}
+
+const openBatchRejectDialog = () => {
+  if (selectedApplications.value.length === 0) {
+    ElMessage.warning('請選擇要駁回的申請')
+    return
+  }
+  isMultipleReject.value = true
+  rejectForm.value.reason = ''
+  rejectDialogVisible.value = true
+}
+
+const handleReject = async () => {
+  if (!rejectFormRef.value) return
+
+  try {
+    await rejectFormRef.value.validate()
+    submittingApproval.value = true
+
+    if (isMultipleReject.value) {
+      let successCount = 0
+      for (const app of selectedApplications.value) {
+        const success = await processApproval(app._id, 'rejected', rejectForm.value.reason)
+        if (success) successCount++
+      }
+
+      if (successCount > 0) {
+        ElMessage.success(`成功駁回 ${successCount} 筆申請`)
+        rejectDialogVisible.value = false
+        await fetchNewEmployees()
+      }
+    } else {
+      const success = await processApproval(
+          currentRejectTarget.value._id,
+          'rejected',
+          rejectForm.value.reason
+      )
+
+      if (success) {
+        ElMessage.success('已駁回申請')
+        rejectDialogVisible.value = false
+        await fetchNewEmployees()
+      }
+    }
+  } catch (error) {
+    if (error?.name === 'ValidationError') return
+    console.error('駁回處理失敗:', error)
+    ElMessage.error('駁回處理失敗，請稍後再試')
   } finally {
     submittingApproval.value = false
   }
@@ -312,23 +440,9 @@ const handleReviewApplications = () => {
   fetchNewEmployees()
 }
 
-const openApprovalDialog = (application, status) => {
-  if (!application?._id) {
-    ElMessage.error('無效的申請資料')
-    return
-  }
-
-  currentApprovalData.value = application
-  approvalForm.value = {
-    status,
-    comment: ''
-  }
-  approvalDialogVisible.value = true
-}
-
 const handleSizeChange = (val) => {
   pageSize.value = val
-  currentPage.value = 1 // 重置頁碼
+  currentPage.value = 1
   fetchNewEmployees()
 }
 
@@ -394,6 +508,8 @@ onMounted(fetchNewEmployees)
 <style scoped>
 .staff-list {
   margin: 16px;
+  background-color: var(--el-bg-color);
+  box-shadow: var(--el-box-shadow-light);
 }
 
 .top-controls {
@@ -408,28 +524,90 @@ onMounted(fetchNewEmployees)
   width: 300px;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
 .table-container {
   margin-top: 20px;
 }
 
-:deep(.el-card) {
-  border-radius: 8px;
+/* 審核對話框樣式 */
+.review-dialog {
+  :deep(.el-dialog__body) {
+    padding-top: 0;
+  }
 }
 
+.review-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.selection-info {
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+}
+
+.batch-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* 駁回對話框樣式 */
+.reject-dialog {
+  .reject-info {
+    margin-bottom: 20px;
+    padding: 12px;
+    background-color: var(--el-color-danger-light-9);
+    border-radius: 4px;
+    color: var(--el-text-color-primary);
+    font-size: 14px;
+  }
+}
+
+/* 表格樣式優化 */
 :deep(.el-table) {
-  --el-table-header-bg-color: #f5f7fa;
+  --el-table-header-bg-color: var(--el-fill-color-light);
+  --el-table-row-hover-bg-color: var(--el-fill-color);
+  border-radius: 8px;
+  overflow: hidden;
 
   th {
     background-color: var(--el-table-header-bg-color);
     font-weight: 600;
+  }
+
+  td {
+    padding: 8px 0;
   }
 }
 
 :deep(.el-tag) {
   min-width: 60px;
   text-align: center;
+  border-radius: 4px;
 }
 
+/* 按鈕樣式優化 */
+:deep(.el-button) {
+  &.is-circle {
+    margin: 0 4px;
+  }
+}
+
+/* 分頁樣式 */
+:deep(.el-pagination) {
+  margin-top: 20px;
+  justify-content: center;
+}
+
+/* 響應式設計 */
 @media (max-width: 768px) {
   .top-controls {
     flex-direction: column;
@@ -438,6 +616,27 @@ onMounted(fetchNewEmployees)
 
   .search-input {
     width: 100%;
+  }
+
+  .batch-actions {
+    flex-direction: column;
+    width: 100%;
+
+    .el-button {
+      width: 100%;
+    }
+  }
+}
+
+/* 暗黑模式適配 */
+:deep(.dark) {
+  .staff-list {
+    background-color: var(--el-bg-color-overlay);
+  }
+
+  .reject-info {
+    background-color: var(--el-color-danger-dark-2);
+    color: var(--el-text-color-primary);
   }
 }
 </style>
