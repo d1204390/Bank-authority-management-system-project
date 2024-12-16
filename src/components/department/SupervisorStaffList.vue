@@ -13,21 +13,13 @@
         </template>
       </el-input>
 
-      <!-- 主管和經理的功能按鈕 -->
+      <!-- 主管的功能按鈕 -->
       <div class="action-buttons">
         <el-button
-            v-if="currentUserPosition === 'S'"
             type="primary"
             @click="handleNewEmployee"
         >
           提交新進員工
-        </el-button>
-        <el-button
-            v-if="currentUserPosition === 'M'"
-            type="success"
-            @click="handleReview"
-        >
-          審核申請
         </el-button>
       </div>
     </div>
@@ -81,11 +73,6 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="提交者" width="100">
-          <template #default="scope">
-            {{ scope.row.submitter?.name || '-' }}
-          </template>
-        </el-table-column>
         <el-table-column label="提交時間" width="150">
           <template #default="scope">
             {{ formatDateTime(scope.row.submittedAt) }}
@@ -103,18 +90,9 @@
 
     <!-- 新進員工表單對話框 -->
     <NewEmployeeDialog
-        v-if="showNewEmployeeDialog"
         v-model:visible="newEmployeeDialogVisible"
         :departmentCode="departmentCode"
         @submit-success="handleNewEmployeeSuccess"
-    />
-
-    <!-- 審核對話框 -->
-    <ReviewApplicationsDialog
-        v-if="showReviewDialog"
-        v-model:visible="reviewDialogVisible"
-        :departmentCode="departmentCode"
-        @review-complete="handleReviewComplete"
     />
   </el-card>
 </template>
@@ -124,7 +102,6 @@ import { ref, computed, inject, defineProps, onMounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import ViewEmployeeDialog from '@/components/staff/ViewEmployeeDialog.vue'
 import NewEmployeeDialog from '@/components/staff/NewEmployeeDialog.vue'
-import ReviewApplicationsDialog from '@/components/shared/ReviewApplicationsDialog.vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 
@@ -139,7 +116,6 @@ const searchQuery = ref('')
 const dialogVisible = ref(false)
 const currentStaff = ref(null)
 const newEmployeeDialogVisible = ref(false)
-const reviewDialogVisible = ref(false)
 const newEmployeesList = ref([])
 const loadingNewEmployees = ref(false)
 
@@ -150,15 +126,6 @@ const props = defineProps({
     required: true
   }
 })
-
-// 計算屬性
-const currentUserPosition = computed(() => {
-  const currentUser = allStaffList.value.find(staff => staff.isCurrent)
-  return currentUser?.position || ''
-})
-
-const showNewEmployeeDialog = computed(() => currentUserPosition.value === 'S')
-const showReviewDialog = computed(() => currentUserPosition.value === 'M')
 
 const departmentStaff = computed(() => {
   return allStaffList.value.filter(staff => staff.department === props.departmentCode)
@@ -192,11 +159,10 @@ const formatDateTime = (dateStr) => {
       timeZone: 'Asia/Taipei'
     }).format(date).replace(/\//g, '-')
   } catch (error) {
-    console.debug('日期格式化錯誤:', error, 'dateStr:', dateStr) // 改用 debug level
+    console.debug('日期格式化錯誤:', error, 'dateStr:', dateStr)
     return '-'
   }
 }
-
 
 // 日期格式化函數
 const formatDate = (dateStr) => {
@@ -214,7 +180,7 @@ const formatDate = (dateStr) => {
       timeZone: 'Asia/Taipei'
     }).format(date).replace(/\//g, '-')
   } catch (error) {
-    console.debug('日期格式化錯誤:', error, 'dateStr:', dateStr) // 改用 debug level
+    console.debug('日期格式化錯誤:', error, 'dateStr:', dateStr)
     return '-'
   }
 }
@@ -253,12 +219,11 @@ const fetchNewEmployees = async () => {
   try {
     const response = await axios.get('/api/new-employees/list', {
       params: {
-        status: '', // 空字串表示獲取所有狀態
+        status: '',
         page: 1,
         limit: 10
       }
     })
-    // 在設置數據前先檢查一下格式
     console.log('API Response:', response.data.employees)
     newEmployeesList.value = response.data.employees
   } catch (error) {
@@ -279,20 +244,10 @@ const handleNewEmployee = () => {
   newEmployeeDialogVisible.value = true
 }
 
-const handleReview = () => {
-  reviewDialogVisible.value = true
-}
-
 const handleNewEmployeeSuccess = () => {
   newEmployeeDialogVisible.value = false
   ElMessage.success('新進員工資料已提交')
-  fetchNewEmployees() // 重新獲取列表
-}
-
-const handleReviewComplete = () => {
-  reviewDialogVisible.value = false
-  ElMessage.success('審核完成')
-  fetchNewEmployees() // 重新獲取列表
+  fetchNewEmployees()
 }
 
 // 組件掛載時獲取數據

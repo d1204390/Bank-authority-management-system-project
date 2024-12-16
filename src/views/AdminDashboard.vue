@@ -48,6 +48,20 @@
             <p>查看系統登入歷史記錄</p>
           </div>
         </div>
+        <div
+            class="menu-item"
+            :class="{
+              active: currentView === 'StaffChanges',
+              'collapsed': isCollapsed && !isMobile
+            }"
+            @click="switchView('StaffChanges')"
+        >
+          <el-icon><Edit /></el-icon>
+          <div class="menu-item-content" v-show="!isCollapsed || isMobile">
+            <h3>人員異動</h3>
+            <p>管理人員異動與新增</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -60,7 +74,7 @@
 
 <script setup>
 import { ref, shallowRef, defineAsyncComponent, onMounted, onUnmounted } from 'vue';
-import { Fold, Expand, UserFilled, List, ArrowDown, ArrowUp } from '@element-plus/icons-vue';
+import { Fold, Expand, UserFilled, List, ArrowDown, ArrowUp,Edit  } from '@element-plus/icons-vue';
 
 // 導入組件
 const UserManagement = defineAsyncComponent(() =>
@@ -69,7 +83,9 @@ const UserManagement = defineAsyncComponent(() =>
 const LoginHistory = defineAsyncComponent(() =>
     import('@/views/LoginHistory.vue')
 );
-
+const StaffChanges = defineAsyncComponent(() =>
+    import('@/views/StaffChanges.vue')
+);
 const currentView = ref('UserManagement');
 const currentComponent = shallowRef(UserManagement);
 const isCollapsed = ref(false);
@@ -99,6 +115,9 @@ const switchView = (view) => {
       break;
     case 'LoginHistory':
       currentComponent.value = LoginHistory;
+      break;
+    case 'StaffChanges':
+      currentComponent.value = StaffChanges;
       break;
   }
   // 在手機模式下，切換視圖後自動收合選單

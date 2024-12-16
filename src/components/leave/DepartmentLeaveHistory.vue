@@ -211,6 +211,17 @@ const departmentCurrentPage = ref(1)
 const departmentPageSize = ref(10)
 const departmentTotal = ref(0)
 const departmentHistory = ref([])
+// 添加用戶角色狀態
+const userPosition = ref('')
+// 獲取用戶資訊
+const getUserInfo = async () => {
+  try {
+    const response = await axios.get('/api/user/profile')
+    userPosition.value = response.data.position
+  } catch (error) {
+    console.error('獲取用戶資訊失敗:', error)
+  }
+}
 
 // 篩選表單
 const filterForm = reactive({
@@ -244,7 +255,7 @@ const hasActiveFilters = computed(() => {
       filterForm.status
 })
 
-// 獲取部門請假歷史
+// 修改獲取部門請假歷史的函數
 const fetchDepartmentHistory = async () => {
   loading.value = true
   try {
@@ -264,9 +275,12 @@ const fetchDepartmentHistory = async () => {
       params.status = filterForm.status
     }
 
-    const response = await axios.get('/api/leave/department-history', {
-      params
-    })
+    // 根據角色使用不同的 API
+    const apiPath = userPosition.value === 'M'
+        ? '/api/leave/manager/department-history'
+        : '/api/leave/department-history'
+
+    const response = await axios.get(apiPath, { params })
 
     departmentHistory.value = response.data.leaves
     departmentTotal.value = response.data.pagination.total
@@ -325,7 +339,9 @@ const getStatusType = (status) => {
 
 // 組件掛載時初始化
 onMounted(() => {
-  fetchDepartmentHistory()
+  getUserInfo().then(() => {
+    fetchDepartmentHistory()
+  })
 })
 </script>
 

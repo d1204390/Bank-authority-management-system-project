@@ -36,6 +36,9 @@ app.use('/api/leave', leaveRoutes);
 // 新增新進員工路由
 const newEmployeeRoutes = require('./routes/newEmployeeRoutes');
 app.use('/api/new-employees', newEmployeeRoutes);
+//建立批量帳號
+const accountRoutes = require('./routes/accountRoutes');
+app.use('/api/accounts', accountRoutes);
 
 // 啟動登入記錄清理服務
 loginHistoryCleanup.start();

@@ -54,7 +54,7 @@
 import { ref, provide } from 'vue'
 import { User, Document, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import SupervisorLeaveManagement from '@/components/leave/SupervisorLeaveManagement.vue'
-import SupervisorStaffManagement from '@/components/leave/SupervisorStaffManagement.vue'
+import SupervisorStaffManagement from '@/components/staff/SupervisorStaffManagement.vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 

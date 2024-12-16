@@ -114,6 +114,7 @@ const loading = ref(false)
 const leaveEvents = ref([])
 const viewType = ref('月')
 const fullCalendar = ref(null)
+const userPosition = ref('')  // 添加用戶職位狀態
 
 // 日曆事件對話框
 const eventDialog = ref({
@@ -133,6 +134,7 @@ watch(viewType, (newValue) => {
   calendarApi.refetchEvents()
 })
 
+
 // 日曆配置
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -149,7 +151,7 @@ const calendarOptions = computed(() => ({
       ...event,
       backgroundColor: eventColors[event.extendedProps.status],
       borderColor: eventColors[event.extendedProps.status],
-      display: durationHours <= 8 ? 'auto' : 'block'  // 根據時數決定顯示方式
+      display: durationHours <= 8 ? 'auto' : 'block'
     }
   }),
   eventClick: handleEventClick,
@@ -218,7 +220,7 @@ const statusTextMap = {
   cancelled: '已撤回'
 }
 
-// 事件顏色對照 (使用半透明色值)
+// 事件顏色對照
 const eventColors = {
   pending: 'rgba(230, 162, 60, 0.85)',
   approved: 'rgba(103, 194, 58, 0.85)',
@@ -226,16 +228,10 @@ const eventColors = {
   cancelled: 'rgba(144, 147, 153, 0.85)'
 }
 
-// 獲取假別文字
+// 工具函數
 const getLeaveTypeText = (type) => leaveTypeMap[type] || type
-
-// 獲取假別標籤類型
 const getLeaveTagType = (type) => leaveTagTypeMap[type] || ''
-
-// 獲取狀態類型
 const getStatusType = (status) => statusTypeMap[status] || ''
-
-// 獲取狀態文字
 const getStatusText = (status) => statusTextMap[status] || status
 
 // 格式化日期時間
@@ -250,7 +246,7 @@ const formatDateTime = (date) => {
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
-// 添加部門狀態
+// 部門相關
 const department = ref('')
 const departmentMap = {
   'BD': '業務部',
@@ -258,14 +254,15 @@ const departmentMap = {
   'LD': '借貸部'
 }
 
-// 獲取當前用戶部門資訊
-const getCurrentDepartment = async () => {
+// 獲取當前用戶資訊
+const getCurrentUserInfo = async () => {
   try {
     const response = await axios.get('/api/user/profile')
     department.value = response.data.department
+    userPosition.value = response.data.position // 設置用戶職位
   } catch (error) {
-    console.error('獲取部門資訊失敗:', error)
-    ElMessage.error('獲取部門資訊失敗')
+    console.error('獲取用戶資訊失敗:', error)
+    ElMessage.error('獲取用戶資訊失敗')
   }
 }
 
@@ -274,7 +271,6 @@ const handleEventContent = (arg) => {
   const { event, view } = arg
   const durationHours = parseFloat(event.extendedProps.formattedDuration.replace('小時', ''))
 
-  // 如果是月視圖且是短時請假（小於8小時）
   if (view.type === 'dayGridMonth' && durationHours <= 8) {
     return {
       html: `
@@ -290,7 +286,6 @@ const handleEventContent = (arg) => {
     }
   }
 
-  // 其他情況（週視圖或長時請假）
   return {
     html: `
       <div class="custom-event-content">
@@ -306,13 +301,11 @@ const handleEventContent = (arg) => {
 
 // 處理事件點擊
 const handleEventClick = (info) => {
-  // 先關閉日期的下拉選單
   const closeButton = document.querySelector('.fc-popover .fc-popover-close')
   if (closeButton) {
     closeButton.click()
   }
 
-  // 確保下拉選單完全關閉後再顯示詳情
   nextTick(() => {
     eventDialog.value.event = info.event
     eventDialog.value.visible = true
@@ -332,7 +325,12 @@ const handleSwitchToApproval = () => {
 const fetchLeaveEvents = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/leave/department-history', {
+    // 根據職位選擇不同的 API
+    const apiPath = userPosition.value === 'M'
+        ? '/api/leave/manager/department-history'
+        : '/api/leave/department-history'
+
+    const response = await axios.get(apiPath, {
       params: {
         limit: 1000
       },
@@ -340,7 +338,6 @@ const fetchLeaveEvents = async () => {
     })
 
     leaveEvents.value = response.data.leaves.map(leave => {
-      // 從 formattedDuration 中提取數字
       const durationHours = parseFloat(leave.formattedDuration.replace('小時', ''))
 
       return {
@@ -350,14 +347,14 @@ const fetchLeaveEvents = async () => {
         end: leave.endDate,
         backgroundColor: eventColors[leave.status],
         borderColor: eventColors[leave.status],
-        display: durationHours <= 8 ? 'auto' : 'block',  // 小於8小時使用圓點，否則使用區塊
+        display: durationHours <= 8 ? 'auto' : 'block',
         extendedProps: {
           employeeName: leave.employeeName,
           leaveType: leave.leaveType,
           reason: leave.reason,
           status: leave.status,
           formattedDuration: leave.formattedDuration,
-          durationHours  // 保存時數以供後續使用
+          durationHours
         }
       }
     })
@@ -380,7 +377,6 @@ const fetchLeaveEvents = async () => {
 const refreshCalendar = async () => {
   await fetchLeaveEvents()
 
-  // 確保在數據更新後重新渲染所有事件
   nextTick(() => {
     const calendarApi = fullCalendar.value?.getApi()
     if (calendarApi) {
@@ -392,9 +388,14 @@ const refreshCalendar = async () => {
 }
 
 // 組件掛載時初始化
-onMounted(() => {
-  getCurrentDepartment()
-  fetchLeaveEvents()
+onMounted(async () => {  // 添加 async
+  try {
+    await getCurrentUserInfo()  // 等待用戶資訊獲取完成
+    await fetchLeaveEvents()    // 再獲取請假記錄
+  } catch (error) {
+    console.error('初始化失敗:', error)
+    ElMessage.error('初始化失敗，請稍後再試')
+  }
 })
 
 // 暴露方法給父組件

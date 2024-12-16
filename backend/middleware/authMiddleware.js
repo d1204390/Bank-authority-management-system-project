@@ -79,6 +79,15 @@ const verifyToken = async (req, res, next) => {
     }
 };
 
+// 經理權限驗證
+const managerAuth = (req, res, next) => {
+    if (req.user && (req.user.position === 'M' || req.user.role === 'admin')) {
+        next();
+    } else {
+        return res.status(403).json({ message: '需要經理權限' });
+    }
+};
+
 // 主管權限驗證
 const supervisorAuth = (req, res, next) => {
     if (req.user && (req.user.position === 'S' || req.user.role === 'admin')) {
@@ -102,5 +111,6 @@ module.exports = {
     updateActivity,
     supervisorAuth,
     adminAuth,
+    managerAuth,
     INACTIVITY_TIMEOUT
 };

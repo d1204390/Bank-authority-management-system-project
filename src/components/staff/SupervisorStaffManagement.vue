@@ -39,8 +39,8 @@
 
 <script setup>
 import { ref, computed, inject, onMounted, watch } from 'vue'
-import DepartmentCard from '@/department/DepartmentCard.vue'
-import DepartmentMembers from '@/department/DepartmentMembers.vue'
+import DepartmentCard from '@/components/department/DepartmentCard.vue'
+import DepartmentMembers from '@/components/department/SupervisorStaffList.vue'
 
 // 注入從父組件提供的數據和方法
 const {

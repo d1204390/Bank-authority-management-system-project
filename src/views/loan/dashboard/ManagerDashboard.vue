@@ -38,10 +38,10 @@
     <!-- 右側內容區 -->
     <div class="content-area">
       <template v-if="activeMenuItem === 'leave'">
-        <SupervisorLeaveManagement />
+        <ManagerLeaveManagement />
       </template>
       <template v-else-if="activeMenuItem === 'staff'">
-        <SupervisorStaffManagement />
+        <ManagerStaffManagement />
       </template>
       <template v-else>
         <div>功能開發中...</div>
@@ -51,22 +51,24 @@
 </template>
 
 <script setup>
-import { ref, provide } from 'vue'
-import { User, Document, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
-import SupervisorLeaveManagement from '@/components/leave/SupervisorLeaveManagement.vue'
-import SupervisorStaffManagement from '@/components/leave/SupervisorStaffManagement.vue'
-import { ElMessage } from 'element-plus'
+import {ref, provide} from 'vue'
+import {User, Document, Calendar, ArrowLeft, ArrowRight} from '@element-plus/icons-vue'
+import ManagerLeaveManagement from '@/components/leave/ManagerLeaveManagement.vue'
+import ManagerStaffManagement from '@/components/staff/ManagerStaffManagement.vue'
+import {ElMessage} from 'element-plus'
 import axios from 'axios'
 
 const allStaffList = ref([])
 const staffDataLoaded = ref(false)
 const loadingStaffData = ref(false)
 
+// 修改為與主管相同的 API 端點
 const fetchAllDepartmentStaff = async () => {
   if (staffDataLoaded.value || loadingStaffData.value) return
 
   loadingStaffData.value = true
   try {
+    // 使用相同的 API 端點
     const response = await axios.get('/api/user/all-department-employees')
     allStaffList.value = response.data
     staffDataLoaded.value = true
@@ -82,6 +84,7 @@ const fetchAllDepartmentStaff = async () => {
   }
 }
 
+// 提供統一的資料管理接口
 provide('staffManagement', {
   allStaffList,
   staffDataLoaded,
@@ -93,9 +96,9 @@ const isSidebarCollapsed = ref(true)
 const activeMenuItem = ref('leave')
 
 const menuItems = [
-  { id: 'staff', label: '員工管理', icon: User },
-  { id: 'loans', label: '貸款審核', icon: Document },
-  { id: 'leave', label: '請假管理', icon: Calendar },
+  {id: 'staff', label: '員工管理', icon: User},
+  {id: 'loans', label: '貸款審核', icon: Document},
+  {id: 'leave', label: '請假管理', icon: Calendar},
 ]
 
 const toggleSidebar = () => {
@@ -146,7 +149,7 @@ const toggleSidebar = () => {
 }
 
 .menu-container {
-  padding: 64px 0 64px;  /* 增加底部內邊距，為底部按鈕留出空間 */
+  padding: 64px 0 64px;
 }
 
 .menu-item {
@@ -177,7 +180,6 @@ const toggleSidebar = () => {
   overflow-y: auto;
 }
 
-/* 響應式設計 */
 @media (max-width: 768px) {
   .sidebar {
     position: fixed;

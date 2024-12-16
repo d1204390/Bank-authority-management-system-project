@@ -107,9 +107,6 @@
 
           <!-- 按鈕 -->
           <el-form-item class="search-form-item button-group">
-            <el-button type="primary" @click="handleSearch" :icon="Search">
-              搜尋
-            </el-button>
             <el-button @click="resetSearch" :icon="Refresh">重置</el-button>
           </el-form-item>
         </div>
@@ -260,13 +257,6 @@
 .stat-number.primary { color: #409eff; }
 .stat-number.info { color: #909399; }
 
-.search-card {
-  margin-bottom: 24px;
-  border-radius: 8px;
-  border: none;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
-}
-
 .search-form {
   padding: 16px;
 }
@@ -355,10 +345,11 @@
 </style>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { Refresh, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import axios from 'axios'
+import _ from 'lodash'
 
 // 數據狀態
 const loginRecords = ref([])
@@ -457,17 +448,11 @@ const fetchStatistics = async () => {
 }
 
 // 事件處理
-const handleSearch = () => {
-  currentPage.value = 1
-  fetchLoginHistory()
-}
-
 const resetSearch = () => {
   dateRange.value = []
   searchAccount.value = ''
   searchName.value = ''
   searchStatus.value = 'all'
-  handleSearch()
 }
 
 const handleSizeChange = (val) => {
@@ -479,6 +464,16 @@ const handleCurrentChange = (val) => {
   currentPage.value = val
   fetchLoginHistory()
 }
+
+// 監聽搜尋條件變化
+watch(
+    [dateRange, searchAccount, searchName, searchStatus],
+    _.debounce(() => {
+      currentPage.value = 1
+      fetchLoginHistory()
+    }, 300),
+    { deep: true }
+)
 
 // 格式化日期
 const formatDate = (row, column) => {
@@ -493,10 +488,10 @@ const formatDate = (row, column) => {
   })
 }
 
-// 在 script setup 中添加
+// 卡片點擊處理
 const handleStatCardClick = (type) => {
-  // 重置搜尋條件
   searchAccount.value = ''
+  searchName.value = ''
 
   const today = new Date()
   const startOfDay = new Date(today.setHours(0, 0, 0, 0))
@@ -520,9 +515,6 @@ const handleStatCardClick = (type) => {
       searchStatus.value = 'failed'
       break
   }
-
-  // 觸發搜尋
-  handleSearch()
 }
 
 // 生命週期
