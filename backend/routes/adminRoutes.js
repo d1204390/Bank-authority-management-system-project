@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const bcrypt = require('bcrypt');
@@ -329,6 +330,46 @@ router.post('/reset-password', async (req, res) => {
             success: false,
             msg: '密碼重置失敗，請重試'
         });
+    }
+});
+
+// 刪除使用者帳號路由
+router.delete('/user/employee', async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { account } = req.body;
+
+        if (!account) {
+            return res.status(400).json({ msg: '缺少必要參數' });
+        }
+
+        // 查找使用者
+        const user = await User.findOne({ account });
+        if (!user) {
+            return res.status(404).json({ msg: '找不到該使用者' });
+        }
+
+        // 刪除使用者，但保留 NewEmployee 紀錄
+        await User.findByIdAndDelete(user._id, { session });
+
+        // 記錄刪除操作
+        console.log(`已刪除使用者帳號: ${account}, 員工編號: ${user.employeeId}`);
+
+        // 提交交易
+        await session.commitTransaction();
+
+        res.json({ msg: '刪除成功' });
+
+    } catch (error) {
+        // 回滾交易
+        await session.abortTransaction();
+        console.error('刪除使用者失敗:', error);
+        res.status(500).json({ msg: '刪除失敗，請重試' });
+    } finally {
+        // 結束會話
+        session.endSession();
     }
 });
 

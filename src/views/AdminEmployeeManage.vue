@@ -743,7 +743,7 @@ const handleDelete = async (row) => {
         }
     )
 
-    await axios.delete('/api/user/employee', {
+    await axios.delete('/api/admin/user/employee', {
       data: { account: row.username }
     })
 
