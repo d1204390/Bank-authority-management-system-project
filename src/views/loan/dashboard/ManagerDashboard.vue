@@ -43,8 +43,8 @@
       <template v-else-if="activeMenuItem === 'staff'">
         <ManagerStaffManagement />
       </template>
-      <template v-else>
-        <div>功能開發中...</div>
+      <template v-if="activeMenuItem === 'loans'">
+        <ManagerWorkView />
       </template>
     </div>
   </div>
@@ -57,6 +57,7 @@ import ManagerLeaveManagement from '@/components/leave/ManagerLeaveManagement.vu
 import ManagerStaffManagement from '@/components/staff/ManagerStaffManagement.vue'
 import {ElMessage} from 'element-plus'
 import axios from 'axios'
+import ManagerWorkView from "@/views/loan/ManagerWorkView.vue";
 
 const allStaffList = ref([])
 const staffDataLoaded = ref(false)
