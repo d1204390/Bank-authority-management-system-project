@@ -74,62 +74,46 @@
                       :position="userPosition"
                   />
                 </el-collapse-item>
-                <!-- 之後可以在這裡添加其他功能的 collapse-item -->
               </el-collapse>
             </div>
           </el-col>
 
-          <!-- 右側：部門功能 -->
+          <!-- 右側：貸款功能 -->
           <el-col :span="12">
             <div class="section-container">
               <h2 class="section-title">部門功能</h2>
-              <el-card class="function-card">
-                <div class="function-header">
-                  <el-icon><Money /></el-icon>
-                  <span>貸款審核</span>
-                </div>
-                <div class="function-content">
-                  <el-row :gutter="10">
-                    <el-col :span="12">
-                      <el-button type="primary" @click="handleLoanProcess">
-                        處理貸款
-                      </el-button>
-                    </el-col>
-                    <el-col :span="12">
-                      <el-button @click="viewLoanHistory">
-                        歷史紀錄
-                      </el-button>
-                    </el-col>
-                  </el-row>
-                  <div class="loan-tasks" v-if="loanTasks.length">
-                    <h4>待處理項目</h4>
-                    <el-scrollbar height="150px">
-                      <ul class="task-list">
-                        <li v-for="task in loanTasks" :key="task.id">
-                          <span>{{ task.name }}</span>
-                          <el-tag :type="task.priority === 'high' ? 'danger' : 'info'" size="small">
-                            {{ task.priority === 'high' ? '急件' : '一般' }}
-                          </el-tag>
-                        </li>
-                      </ul>
-                    </el-scrollbar>
-                  </div>
-                </div>
-              </el-card>
+              <StaffLoanOperation
+                  @refresh-stats="initDashboard"
+                  @case-submitted="handleCaseSubmitted"
+              />
             </div>
           </el-col>
         </el-row>
       </el-col>
     </el-row>
+
+    <!-- 申請表單對話框 -->
+    <el-dialog
+        v-model="showLoanForm"
+        title="貸款申請"
+        width="80%"
+        :close-on-click-modal="false"
+    >
+      <LoanApplicationForm
+          ref="loanFormRef"
+          @submit="handleLoanSubmit"
+      />
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Document, Loading, SuccessFilled, Warning, Money, Calendar } from '@element-plus/icons-vue'
-
+import { Document, Loading, SuccessFilled, Warning, Calendar } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import LeaveManagement from '@/components/leave/LeaveApplication.vue'
+import StaffLoanOperation from '@/components/loan/StaffLoanOperation.vue'
+import LoanApplicationForm from '@/components/loan/LoanApplicationForm.vue'
 
 // 從 sessionStorage 獲取用戶資訊
 const getUserInfo = () => {
@@ -142,8 +126,11 @@ const getUserInfo = () => {
   }
 }
 
-// 控制當前展開的面板
-const activeCollapse = ref(['leave']) // 預設展開請假管理
+// 控制面板和對話框
+const activeCollapse = ref(['leave'])
+const showLoanForm = ref(false)
+const loanFormRef = ref(null)
+
 // 用戶資訊
 const userInfo = getUserInfo()
 const userDepartment = computed(() => userInfo.department || 'LD')
@@ -157,10 +144,7 @@ const stats = ref({
   urgentLoans: 0
 })
 
-// 貸款任務
-const loanTasks = ref([])
-
-// 初始化數據
+// 初始化儀表板數據
 const initDashboard = async () => {
   try {
     // 模擬 API 調用
@@ -170,26 +154,23 @@ const initDashboard = async () => {
       completedLoans: 12,
       urgentLoans: 2
     }
-
-    loanTasks.value = [
-      { id: 1, name: '王小明的房貸申請', priority: 'high' },
-      { id: 2, name: '李小華的信貸審核', priority: 'normal' },
-      { id: 3, name: '張大明的貸款評估', priority: 'high' }
-    ]
   } catch (error) {
     console.error('初始化儀表板失敗:', error)
     ElMessage.error('獲取數據失敗，請稍後再試')
   }
 }
 
-// 處理貸款
-const handleLoanProcess = () => {
-  // 導航到貸款處理頁面
+// 處理案件提交
+const handleCaseSubmitted = () => {
+  initDashboard() // 重新載入統計數據
+  ElMessage.success('案件提交成功')
 }
 
-// 查看貸款紀錄
-const viewLoanHistory = () => {
-  // 導航到貸款紀錄頁面
+// 處理貸款申請提交
+const handleLoanSubmit = () => {
+  showLoanForm.value = false
+  loanFormRef.value?.resetForm()
+  initDashboard() // 重新載入統計數據
 }
 
 // 組件掛載時初始化
@@ -251,65 +232,6 @@ onMounted(() => {
   color: #303133;
 }
 
-.function-card {
-  margin-bottom: 20px;
-}
-
-.function-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px;
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.function-header .el-icon {
-  margin-right: 8px;
-  font-size: 20px;
-  color: #409EFF;
-}
-
-.function-content {
-  padding: 10px 0;
-}
-
-.loan-tasks {
-  margin-top: 15px;
-}
-
-.task-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.task-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #EBEEF5;
-}
-
-.task-list li:last-child {
-  border-bottom: none;
-}
-
-/* 響應式調整 */
-@media (max-width: 768px) {
-  .el-col {
-    margin-bottom: 20px;
-  }
-
-  .stat-card {
-    height: 80px;
-  }
-
-  .stat-value {
-    font-size: 20px;
-  }
-}
-
 .el-collapse {
   border: none;
 }
@@ -339,5 +261,20 @@ onMounted(() => {
 
 :deep(.el-collapse-item__wrap) {
   border: none;
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+  .el-col {
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    height: 80px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
 }
 </style>
