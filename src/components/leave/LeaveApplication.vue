@@ -256,7 +256,7 @@
                       placement="top"
                   >
                     <template #content>
-                      <div>審核主管: {{ row.approvalChain[row.approvalChain.length - 1].approverName }}</div>
+                      <div>審核人員: {{ row.approvalChain[row.approvalChain.length - 1].approverName }}</div>
                       <div>審核時間: {{ row.approvalChain[row.approvalChain.length - 1].timestamp }}</div>
                       <div>審核結果: {{ statusTypes[row.approvalChain[row.approvalChain.length - 1].status] }}</div>
                     </template>
