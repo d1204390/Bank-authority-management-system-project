@@ -201,8 +201,9 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
+import { defineEmits, defineExpose } from 'vue';
 import { Plus } from '@element-plus/icons-vue'
-import { ElMessage,defineEmits ,defineExpose} from 'element-plus'
+import { ElMessage} from 'element-plus'
 
 // 當前步驟
 const currentStep = ref(0)
