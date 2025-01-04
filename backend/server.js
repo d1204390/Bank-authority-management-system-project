@@ -33,6 +33,10 @@ app.use('/api/user', userRoutes);
 const leaveRoutes = require('./routes/leave');
 app.use('/api/leave', leaveRoutes);
 
+// Loan routes
+const loanRoutes = require('./routes/loanRoutes');
+app.use('/api/loan', loanRoutes);
+
 // 新增新進員工路由
 const newEmployeeRoutes = require('./routes/newEmployeeRoutes');
 app.use('/api/new-employees', newEmployeeRoutes);
