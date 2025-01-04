@@ -7,7 +7,11 @@
         <div class="stats-container">
           <el-row :gutter="20">
             <el-col :xs="12" :sm="6">
-              <el-card class="stat-card">
+              <el-card
+                  class="stat-card"
+                  :class="{ 'active': currentStatus === 'pending' }"
+                  @click="handleStatusFilter('pending')"
+              >
                 <div class="stat-content">
                   <el-icon class="stat-icon"><Document /></el-icon>
                   <div class="stat-info">
@@ -18,7 +22,11 @@
               </el-card>
             </el-col>
             <el-col :xs="12" :sm="6">
-              <el-card class="stat-card">
+              <el-card
+                  class="stat-card"
+                  :class="{ 'active': currentStatus === 'processing' }"
+                  @click="handleStatusFilter('processing')"
+              >
                 <div class="stat-content">
                   <el-icon class="stat-icon"><Loading /></el-icon>
                   <div class="stat-info">
@@ -29,7 +37,11 @@
               </el-card>
             </el-col>
             <el-col :xs="12" :sm="6">
-              <el-card class="stat-card">
+              <el-card
+                  class="stat-card"
+                  :class="{ 'active': currentStatus === 'approved' }"
+                  @click="handleStatusFilter('approved')"
+              >
                 <div class="stat-content">
                   <el-icon class="stat-icon"><SuccessFilled /></el-icon>
                   <div class="stat-info">
@@ -40,7 +52,11 @@
               </el-card>
             </el-col>
             <el-col :xs="12" :sm="6">
-              <el-card class="stat-card">
+              <el-card
+                  class="stat-card"
+                  :class="{ 'active': currentStatus === 'rejected' }"
+                  @click="handleStatusFilter('rejected')"
+              >
                 <div class="stat-content">
                   <el-icon class="stat-icon"><Warning /></el-icon>
                   <div class="stat-info">
@@ -98,9 +114,38 @@
                   </el-table-column>
                   <el-table-column prop="status" label="狀態" width="100">
                     <template #default="scope">
-                      <el-tag :type="getStatusType(scope.row.status)">
-                        {{ getStatusLabel(scope.row.status) }}
-                      </el-tag>
+                      <el-popover
+                          placement="right"
+                          :width="300"
+                          trigger="hover"
+                      >
+                        <template #reference>
+                          <el-tag :type="getStatusType(scope.row.status)">
+                            {{ getStatusLabel(scope.row.status) }}
+                          </el-tag>
+                        </template>
+
+                        <!-- 審核記錄內容 -->
+                        <div v-if="scope.row.approvalChain && scope.row.approvalChain.length > 0">
+                          <div v-for="(approval, index) in scope.row.approvalChain"
+                               :key="index"
+                               class="approval-item"
+                          >
+                            <div class="approval-header">
+  <span class="approval-position">
+    {{ getPositionText(approval.approverPosition) }} -
+    {{ approval.approverName }}
+  </span>
+                              <el-tag size="small" :type="getApprovalType(approval.status)">
+                                {{ getApprovalStatus(approval.status) }}
+                              </el-tag>
+                            </div>
+                            <div class="approval-time">{{ formatDateTime(approval.timestamp) }}</div>
+                            <div class="approval-comment">{{ approval.comment }}</div>
+                          </div>
+                        </div>
+                        <div v-else class="no-approval">尚無審核紀錄</div>
+                      </el-popover>
                     </template>
                   </el-table-column>
                   <el-table-column prop="loanInfo.isUrgent" label="急件" width="80">
@@ -191,7 +236,7 @@ const loanList = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
-
+const currentStatus = ref('')
 // 統計數據
 const stats = ref({
   pendingLoans: 0,
@@ -199,6 +244,11 @@ const stats = ref({
   completedLoans: 0,
   rejectedLoans: 0
 })
+// 處理狀態過濾
+const handleStatusFilter = (status) => {
+  currentStatus.value = currentStatus.value === status ? '' : status
+  fetchList() // 只重新獲取列表數據
+}
 
 // 格式化金額
 const formatAmount = (amount) => {
@@ -218,6 +268,36 @@ const formatDate = (date) => {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+// 修改 fetchList 函數
+const fetchList = async () => {
+  try {
+    const response = await axios.get('/api/loan/list', {
+      params: {
+        page: currentPage.value,
+        limit: pageSize.value,
+        status: currentStatus.value || undefined,
+        employeeId: userInfo.employeeId  // 加入這行，確保只看到自己的申請
+      }
+    })
+    loanList.value = response.data.applications
+    total.value = response.data.pagination.total
+  } catch (error) {
+    console.error('獲取列表數據失敗:', error)
+    ElMessage.error('獲取列表數據失敗')
+  }
+}
+
+// 添加一個獲取統計數據的函數
+const fetchStats = async () => {
+  try {
+    const response = await axios.get('/api/loan/stats')
+    stats.value = response.data
+  } catch (error) {
+    console.error('獲取統計數據失敗:', error)
+    ElMessage.error('獲取統計數據失敗')
+  }
 }
 
 // 獲取狀態標籤類型
@@ -242,23 +322,13 @@ const getStatusLabel = (status) => {
   return labelMap[status] || status
 }
 
-// 初始化儀表板數據
+// 初始化儀表板數據，添加 status 參數
 const initDashboard = async () => {
   try {
-    const response = await axios.get('/api/loan/list')
-    const loans = response.data.applications
-
-    // 更新列表數據
-    loanList.value = loans
-    total.value = response.data.pagination.total
-
-    // 計算統計數據
-    stats.value = {
-      pendingLoans: loans.filter(loan => loan.status === 'pending').length,
-      processingLoans: loans.filter(loan => loan.status === 'processing').length,
-      completedLoans: loans.filter(loan => loan.status === 'approved').length,
-      rejectedLoans: loans.filter(loan => loan.status === 'rejected').length
-    }
+    await Promise.all([
+      fetchStats(),
+      fetchList()
+    ])
   } catch (error) {
     console.error('初始化儀表板失敗:', error)
     ElMessage.error('獲取數據失敗，請稍後再試')
@@ -289,6 +359,40 @@ const handleDialogClose = (done) => {
   }
 }
 
+// 在你的 script setup 部分添加這些函數
+const getPositionText = (position) => {
+  const texts = {
+    S: '主管',
+    M: '經理',
+    C: '科員'
+  }
+  return texts[position] || position
+}
+
+const getApprovalType = (status) => {
+  return status === 'approved' ? 'success' :
+      status === 'rejected' ? 'danger' :
+          'warning'
+}
+
+const getApprovalStatus = (status) => {
+  const texts = {
+    approved: '核准',
+    rejected: '拒絕',
+    processing: '處理中'
+  }
+  return texts[status] || status
+}
+
+const formatDateTime = (date) => {
+  return new Date(date).toLocaleString('zh-TW', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 
 // 處理貸款申請提交
 const handleLoanSubmit = () => {
@@ -300,12 +404,12 @@ const handleLoanSubmit = () => {
 // 分頁處理
 const handleSizeChange = (val) => {
   pageSize.value = val
-  initDashboard()
+  fetchList()  // 改成只調用 fetchList
 }
 
 const handleCurrentChange = (val) => {
   currentPage.value = val
-  initDashboard()
+  fetchList()  // 改成只調用 fetchList
 }
 
 // 組件掛載時初始化
@@ -396,6 +500,61 @@ onMounted(() => {
 :deep(.loan-dialog) {
   /* 讓對話框出現在上方 */
   margin-top: 5px; /* 可以調整這個值來控制具體高度 */
+}
+
+.approval-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.approval-item:last-child {
+  border-bottom: none;
+}
+
+.approval-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.approval-position {
+  font-weight: bold;
+  color: #303133;
+}
+
+.approval-time {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.approval-comment {
+  color: #606266;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.no-approval {
+  color: #909399;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.stat-card {
+  height: 100px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+}
+
+.stat-card.active {
+  border: 2px solid #409EFF;
 }
 
 /* 如果需要在小螢幕上調整位置 */

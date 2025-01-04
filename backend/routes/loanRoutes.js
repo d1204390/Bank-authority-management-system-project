@@ -56,9 +56,10 @@ router.post('/apply', verifyToken, async (req, res) => {
 /**
  * 取得貸款申請列表
  */
+// 修改 /list 路由
 router.get('/list', verifyToken, async (req, res) => {
     try {
-        const { status, page = 1, limit = 10 } = req.query;
+        const { status, minAmount, page = 1, limit = 10 } = req.query;
 
         const user = await User.findById(req.user.id)
             .select('employeeId department position')
@@ -68,23 +69,51 @@ router.get('/list', verifyToken, async (req, res) => {
             return res.status(403).json({ msg: '只有借貸部門可以查看申請' });
         }
 
+        // 建立查詢條件
         const query = {};
 
+        // 設置用戶權限相關的查詢條件
         if (user.position === 'C') {
             query.employeeId = user.employeeId;
         }
 
+        // 狀態過濾
         if (status) {
             query.status = status;
         }
 
+        // 金額過濾
+        if (minAmount) {
+            query['loanInfo.amount'] = { $gte: parseInt(minAmount) };
+        }
+
         const total = await LoanApplication.countDocuments(query);
 
-        const applications = await LoanApplication.find(query)
-            .sort({ createdAt: -1 })
-            .skip((parseInt(page) - 1) * parseInt(limit))
-            .limit(parseInt(limit))
-            .lean();
+        // 使用 aggregate 替代 find
+        const applications = await LoanApplication.aggregate([
+            { $match: query },
+            { $sort: { createdAt: -1 } },
+            { $skip: (parseInt(page) - 1) * parseInt(limit) },
+            { $limit: parseInt(limit) },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'employeeId',
+                    foreignField: 'employeeId',
+                    as: 'employee'
+                }
+            },
+            {
+                $addFields: {
+                    employeeName: { $arrayElemAt: ['$employee.name', 0] }
+                }
+            },
+            {
+                $project: {
+                    employee: 0  // 移除完整的 employee 陣列
+                }
+            }
+        ]);
 
         res.json({
             applications,
@@ -100,7 +129,6 @@ router.get('/list', verifyToken, async (req, res) => {
         res.status(500).json({ msg: '獲取申請列表失敗' });
     }
 });
-
 /**
  * 主管審核貸款申請
  */
@@ -108,7 +136,7 @@ router.post('/supervisor-review/:id', verifyToken, supervisorAuth, async (req, r
     try {
         // 查詢用戶獲取 employeeId
         const user = await User.findById(req.user.id)
-            .select('employeeId department')
+            .select('employeeId department name')
             .lean();
 
         if (!user) {
@@ -145,6 +173,7 @@ router.post('/supervisor-review/:id', verifyToken, supervisorAuth, async (req, r
         // 新增審核記錄
         application.approvalChain.push({
             approverEmployeeId: user.employeeId,
+            approverName: user.name,
             approverPosition: 'S',
             status: status,
             comment: comment,
@@ -191,7 +220,7 @@ router.post('/manager-review/:id', verifyToken, managerAuth, async (req, res) =>
     try {
         // 查詢用戶獲取 employeeId
         const user = await User.findById(req.user.id)
-            .select('employeeId department')
+            .select('employeeId department name')
             .lean();
 
         if (!user) {
@@ -234,6 +263,7 @@ router.post('/manager-review/:id', verifyToken, managerAuth, async (req, res) =>
         application.approvalChain.push({
             approverEmployeeId: user.employeeId,
             approverPosition: 'M',
+            approverName: user.name,
             status: status,
             comment: comment,
             timestamp: new Date()
@@ -297,11 +327,31 @@ router.get('/review-history', verifyToken, async (req, res) => {
         const total = await LoanApplication.countDocuments(query);
 
         // 獲取審核記錄
-        const reviews = await LoanApplication.find(query)
-            .sort({ 'createdAt': -1 }) // 依建立時間排序
-            .skip(skip)
-            .limit(parseInt(limit))
-            .lean();
+// 查詢貸款申請並關聯用戶資訊
+        const reviews = await LoanApplication.aggregate([
+            { $match: query },
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: parseInt(limit) },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'employeeId',
+                    foreignField: 'employeeId',
+                    as: 'employee'
+                }
+            },
+            {
+                $addFields: {
+                    employeeName: { $arrayElemAt: ['$employee.name', 0] }
+                }
+            },
+            {
+                $project: {
+                    employee: 0
+                }
+            }
+        ]);
 
         res.json({
             reviews,
@@ -320,5 +370,20 @@ router.get('/review-history', verifyToken, async (req, res) => {
         });
     }
 });
+
+router.get('/stats', async (req, res) => {
+    try {
+        // 計算各狀態的數量
+        const stats = {
+            pendingLoans: await LoanApplication.countDocuments({ status: 'pending' }),
+            processingLoans: await LoanApplication.countDocuments({ status: 'processing' }),
+            completedLoans: await LoanApplication.countDocuments({ status: 'approved' }),
+            rejectedLoans: await LoanApplication.countDocuments({ status: 'rejected' })
+        }
+        res.json(stats)
+    } catch (error) {
+        res.status(500).json({ message: '獲取統計數據失敗' })
+    }
+})
 
 module.exports = router;

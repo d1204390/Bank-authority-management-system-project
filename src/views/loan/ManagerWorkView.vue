@@ -1,15 +1,14 @@
-<!-- views/loan/ManagerWorkView.vue -->
 <template>
   <div class="work-view-container">
-    <el-tabs v-model="activeTab" class="work-tabs">
+    <el-tabs v-model="activeTab" class="work-tabs" @tab-click="handleTabChange">
       <el-tab-pane label="工作指派" name="assignment">
         <ManagerAssignment />
       </el-tab-pane>
       <el-tab-pane label="審核申請" name="review">
-        <ManagerReview />
+        <ManagerReview @review-completed="handleReviewCompleted" />
       </el-tab-pane>
       <el-tab-pane label="審核紀錄" name="history">
-        <ReviewHistory position="M" />
+        <ReviewHistory ref="historyRef" position="M" />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -17,31 +16,25 @@
 
 <script setup>
 import { ref } from 'vue'
-import ManagerReview from "@/components/loan/ManagerReview.vue"
-import ManagerAssignment from "@/components/loan/ManagerAssignment.vue"
+import ManagerReview from '@/components/loan/ManagerReview.vue'
+import ManagerAssignment from '@/components/loan/ManagerAssignment.vue'
 import ReviewHistory from '@/components/loan/ReviewHistory.vue'
 
 const activeTab = ref('assignment')
-</script>
+const historyRef = ref(null)
 
-<style scoped>
-.work-view-container {
-  padding: 20px;
-}
-
-.work-tabs {
-  background-color: white;
-  border-radius: 4px;
-  padding: 20px;
-}
-
-:deep(.el-tabs__header) {
-  margin-bottom: 20px;
-}
-
-@media (max-width: 768px) {
-  .work-view-container {
-    padding: 10px;
+// 處理審核完成事件
+const handleReviewCompleted = () => {
+  if (activeTab.value === 'history' && historyRef.value) {
+    historyRef.value.fetchReviews()
   }
 }
-</style>
+
+// 處理標籤切換
+const handleTabChange = (tab) => {
+  // 添加一個檢查以確保方法存在
+  if (tab.props.name === 'history' && historyRef.value?.fetchReviews) {
+    historyRef.value.fetchReviews()
+  }
+}
+</script>

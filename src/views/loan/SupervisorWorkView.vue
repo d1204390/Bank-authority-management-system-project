@@ -1,15 +1,14 @@
-<!-- views/loan/SupervisorWorkView.vue -->
 <template>
   <div class="work-view-container">
-    <el-tabs v-model="activeTab" class="work-tabs">
+    <el-tabs v-model="activeTab" class="work-tabs" @tab-click="handleTabChange">
       <el-tab-pane label="工作指派" name="assignment">
         <SupervisorAssignment />
       </el-tab-pane>
       <el-tab-pane label="審核申請" name="review">
-        <SupervisorReview />
+        <SupervisorReview @review-completed="handleReviewCompleted" />
       </el-tab-pane>
       <el-tab-pane label="審核紀錄" name="history">
-        <ReviewHistory position="S" />
+        <ReviewHistory ref="historyRef" position="S" />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -22,26 +21,20 @@ import SupervisorAssignment from '@/components/loan/SupervisorAssignment.vue'
 import ReviewHistory from '@/components/loan/ReviewHistory.vue'
 
 const activeTab = ref('assignment')
-</script>
+const historyRef = ref(null)
 
-<style scoped>
-.work-view-container {
-  padding: 20px;
-}
-
-.work-tabs {
-  background-color: white;
-  border-radius: 4px;
-  padding: 20px;
-}
-
-:deep(.el-tabs__header) {
-  margin-bottom: 20px;
-}
-
-@media (max-width: 768px) {
-  .work-view-container {
-    padding: 10px;
+// 處理審核完成事件
+const handleReviewCompleted = () => {
+  // 如果當前是在審核紀錄頁面，立即更新數據
+  if (activeTab.value === 'history' && historyRef.value) {
+    historyRef.value.fetchReviews()
   }
 }
-</style>
+
+// 處理標籤切換
+const handleTabChange = (tab) => {
+  if (tab.props.name === 'history' && historyRef.value?.fetchReviews) {
+    historyRef.value.fetchReviews()
+  }
+}
+</script>

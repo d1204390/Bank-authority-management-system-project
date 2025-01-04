@@ -105,22 +105,23 @@
               >
                 查看
               </el-button>
-              <el-button
-                  v-if="row.status === 'processing'"
-                  type="success"
-                  size="small"
-                  @click="handleReview(row, 'approve')"
-              >
-                核准
-              </el-button>
-              <el-button
-                  v-if="row.status === 'processing'"
-                  type="danger"
-                  size="small"
-                  @click="handleReview(row, 'reject')"
-              >
-                拒絕
-              </el-button>
+              <!-- 只有當金額大於等於500萬且主管已核准時才顯示審核按鈕 -->
+              <template v-if="row.loanInfo.amount >= 5000000 && row.status === 'processing'">
+                <el-button
+                    type="success"
+                    size="small"
+                    @click="handleReview(row, 'approve')"
+                >
+                  核准
+                </el-button>
+                <el-button
+                    type="danger"
+                    size="small"
+                    @click="handleReview(row, 'reject')"
+                >
+                  拒絕
+                </el-button>
+              </template>
             </el-button-group>
           </template>
         </el-table-column>
@@ -190,6 +191,8 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="案件編號">{{ currentApplication.applicationId }}</el-descriptions-item>
           <el-descriptions-item label="申請時間">{{ formatDateTime(currentApplication.createdAt) }}</el-descriptions-item>
+          <el-descriptions-item label="承辦人">{{ currentApplication.employeeName || '未指定' }}</el-descriptions-item>
+          <el-descriptions-item label="承辦人編號">{{ currentApplication.employeeId || '未指定' }}</el-descriptions-item>
           <el-descriptions-item label="處理狀態">
             <el-tag :type="getStatusType(currentApplication.status)">
               {{ getStatusText(currentApplication.status) }}
@@ -238,11 +241,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineEmits } from 'vue'
 import {
-  Document,
   Search,
-  Clock,
   Money,
   Bell
 } from '@element-plus/icons-vue'
@@ -274,6 +275,7 @@ const currentApplication = ref(null)
 const reviewForm = ref({
   comment: ''
 })
+const emit = defineEmits(['review-completed'])
 
 // 統計數據
 const statistics = ref({
@@ -285,18 +287,6 @@ const statistics = ref({
 
 // 計算統計卡片數據
 const stats = computed(() => [
-  {
-    label: '待審核案件',
-    value: statistics.value.pendingCount,
-    icon: Document,
-    type: 'primary'
-  },
-  {
-    label: '今日已審核',
-    value: statistics.value.reviewedToday,
-    icon: Clock,
-    type: 'success'
-  },
   {
     label: '大額案件',
     value: statistics.value.largeAmountCount,
@@ -407,26 +397,17 @@ const getSupervisorComment = (application) => {
 // API 調用函數
 const fetchStatistics = async () => {
   try {
-    const pendingApps = applications.value.filter(app =>
+    // 大額且待經理審核的案件
+    const pendingManagerReview = applications.value.filter(app =>
         app.status === 'processing' && app.loanInfo.amount >= 5000000
     )
+
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
     statistics.value = {
-      pendingCount: pendingApps.length,
-      reviewedToday: applications.value.filter(app => {
-        const managerApproval = app.approvalChain.find(
-            approval => approval.approverPosition === 'M'
-        )
-        if (!managerApproval) return false
-        const approvalDate = new Date(managerApproval.timestamp)
-        return approvalDate >= today
-      }).length,
-      largeAmountCount: applications.value.filter(app =>
-          app.status === 'processing' && app.loanInfo.amount >= 5000000
-      ).length,
-      urgentCount: pendingApps.filter(app => app.loanInfo.isUrgent).length
+      largeAmountCount: pendingManagerReview.length,  // 大額且待經理審核的案件數
+      urgentCount: pendingManagerReview.filter(app => app.loanInfo.isUrgent).length  // 其中的急件數
     }
   } catch (error) {
     console.error('計算統計數據失敗:', error)
@@ -434,6 +415,7 @@ const fetchStatistics = async () => {
   }
 }
 
+// 修改 fetchApplications 函數
 const fetchApplications = async () => {
   loading.value = true
   try {
@@ -441,8 +423,8 @@ const fetchApplications = async () => {
       params: {
         page: currentPage.value,
         limit: pageSize.value,
-        status: 'processing',  // 只獲取待經理審核的案件
-        minAmount: 5000000     // 只獲取大額案件
+        status: 'processing',  // 主管已核准的案件
+        minAmount: 5000000    // 大額案件（500萬以上）
       }
     })
     applications.value = response.data.applications
@@ -496,7 +478,15 @@ const submitReview = async () => {
 
     ElMessage.success('審核完成')
     reviewDialogVisible.value = false
-    await fetchApplications()  // 重新載入列表和統計數據
+
+    // 立即刷新列表和統計數據
+    await fetchApplications()
+
+    // 發出審核完成事件
+    emit('review-completed')
+
+    // 可選：重置分頁到第一頁
+    currentPage.value = 1
 
   } catch (error) {
     console.error('審核失敗:', error)

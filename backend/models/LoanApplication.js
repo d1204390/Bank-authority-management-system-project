@@ -74,6 +74,10 @@ const loanApplicationSchema = new mongoose.Schema({
             type: String,
             required: true
         },
+        approverName: {    // 新增這個欄位
+            type: String,
+            required: true
+        },
         approverPosition: {
             type: String,
             required: true,

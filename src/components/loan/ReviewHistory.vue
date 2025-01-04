@@ -125,6 +125,13 @@
             {{ loanPurposes[row.loanInfo.purpose] }}
           </template>
         </el-table-column>
+        <el-table-column label="處理狀態" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="審核結果" width="200">
           <template #default="{ row }">
             <div class="review-tags">
@@ -138,6 +145,16 @@
                 {{ getApprovalStatus(approval.status) }}
               </el-tag>
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="承辦人" width="120">
+          <template #default="{ row }">
+            <el-tooltip
+                :content="row.employeeId || '未指定'"
+                placement="top"
+            >
+              <span>{{ row.employeeName || '未指定' }}</span>
+            </el-tooltip>
           </template>
         </el-table-column>
         <el-table-column label="審核時間" width="170">
@@ -191,6 +208,8 @@
           <el-descriptions :column="2" border>
             <el-descriptions-item label="案件編號">{{ currentApplication.applicationId }}</el-descriptions-item>
             <el-descriptions-item label="申請時間">{{ formatDateTime(currentApplication.createdAt) }}</el-descriptions-item>
+            <el-descriptions-item label="承辦人">{{ currentApplication.employeeName || '未指定' }}</el-descriptions-item>
+            <el-descriptions-item label="承辦人編號">{{ currentApplication.employeeId || '未指定' }}</el-descriptions-item>
             <el-descriptions-item label="處理狀態">
               <el-tag :type="getStatusType(currentApplication.status)">
                 {{ getStatusText(currentApplication.status) }}
@@ -240,7 +259,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted,defineProps } from 'vue'
+import { ref, computed, onMounted,defineProps,defineExpose  } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
@@ -484,6 +503,10 @@ const viewDetail = (row) => {
   currentApplication.value = row
   detailDialogVisible.value = true
 }
+
+defineExpose({
+  fetchReviews
+})
 
 // 生命週期鉤子
 onMounted(() => {

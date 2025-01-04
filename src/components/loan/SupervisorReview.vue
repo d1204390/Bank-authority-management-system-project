@@ -202,6 +202,8 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="案件編號">{{ currentApplication.applicationId }}</el-descriptions-item>
           <el-descriptions-item label="申請時間">{{ formatDateTime(currentApplication.createdAt) }}</el-descriptions-item>
+          <el-descriptions-item label="承辦人">{{ currentApplication.employeeName || '未指定' }}</el-descriptions-item>
+          <el-descriptions-item label="承辦人編號">{{ currentApplication.employeeId || '未指定' }}</el-descriptions-item>
           <el-descriptions-item label="處理狀態">
             <el-tag :type="getStatusType(currentApplication.status)">
               {{ getStatusText(currentApplication.status) }}
@@ -250,12 +252,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineEmits } from 'vue'
 import {
-  Document,
   Warning,
   Search,
-  Clock,
   Money,
   Bell
 } from '@element-plus/icons-vue'
@@ -287,6 +287,7 @@ const reviewForm = ref({
   comment: ''
 })
 const dateRange = ref([])
+const emit = defineEmits(['review-completed'])
 
 // 統計數據
 const statistics = ref({
@@ -298,18 +299,6 @@ const statistics = ref({
 
 // 計算統計卡片數據
 const stats = computed(() => [
-  {
-    label: '待審核案件',
-    value: statistics.value.pendingCount,
-    icon: Document,
-    type: 'primary'
-  },
-  {
-    label: '今日已審核',
-    value: statistics.value.reviewedToday,
-    icon: Clock,
-    type: 'success'
-  },
   {
     label: '大額案件',
     value: statistics.value.largeAmountCount,
@@ -407,29 +396,12 @@ const getTimelineItemType = (status) => {
 // API 調用函數
 const fetchStatistics = async () => {
   try {
-    // 獲取今日日期
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
     statistics.value = {
-      // 當前待審核案件就是 applications 的長度
-      pendingCount: applications.value.length,
-
-      // 計算今日審核數（從 approvalChain 中查找）
-      reviewedToday: applications.value.reduce((count, app) => {
-        const hasReviewToday = app.approvalChain.some(approval => {
-          const approvalDate = new Date(approval.timestamp)
-          return approvalDate >= today
-        })
-        return count + (hasReviewToday ? 1 : 0)
-      }, 0),
-
-      // 大額案件數
+      pendingCount: applications.value.length,  // 當前待審核案件數
+      reviewedToday: 0,  // 今日審核數（可以從其他 API 獲取或維持 0）
       largeAmountCount: applications.value.filter(app =>
           app.loanInfo.amount >= 5000000
       ).length,
-
-      // 急件數
       urgentCount: applications.value.filter(app =>
           app.loanInfo.isUrgent
       ).length
@@ -447,7 +419,7 @@ const fetchApplications = async () => {
       params: {
         page: currentPage.value,
         limit: pageSize.value,
-        status: 'pending'  // 加入這行，只獲取待審核案件
+        status: 'pending'  // 只獲取待審核案件
       }
     })
     applications.value = response.data.applications
@@ -455,6 +427,12 @@ const fetchApplications = async () => {
 
     // 更新統計數據
     fetchStatistics()
+
+    // 如果當前頁沒有數據且不是第一頁，則回到上一頁
+    if (applications.value.length === 0 && currentPage.value > 1) {
+      currentPage.value--
+      fetchApplications()
+    }
   } catch (error) {
     console.error('獲取申請列表失敗:', error)
     ElMessage.error('獲取申請列表失敗')
@@ -501,7 +479,18 @@ const submitReview = async () => {
 
     ElMessage.success('審核完成')
     reviewDialogVisible.value = false
-    await fetchApplications()  // 重新載入列表和統計數據
+
+    // 重新獲取列表資料
+    await fetchApplications()
+
+    // 如果目前頁面已經沒有資料了，回到第一頁
+    if (applications.value.length === 0) {
+      currentPage.value = 1
+      await fetchApplications()
+    }
+
+    // 發出審核完成事件
+    emit('review-completed')
 
   } catch (error) {
     console.error('審核失敗:', error)
@@ -510,7 +499,6 @@ const submitReview = async () => {
     submitting.value = false
   }
 }
-
 // 生命週期鉤子
 onMounted(() => {
   fetchApplications()
