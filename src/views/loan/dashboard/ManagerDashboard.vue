@@ -1,3 +1,4 @@
+# views/ManagerDashboard.vue
 <template>
   <div class="dashboard-layout">
     <!-- 左側選單 -->
@@ -37,31 +38,39 @@
 
     <!-- 右側內容區 -->
     <div class="content-area">
-      <template v-if="activeMenuItem === 'leave'">
+      <template v-if="activeMenuItem === 'overview'">
+        <StatsOverview
+            @update-menu-item="handleMenuItemUpdate"
+            @update-tab="handleTabUpdate"
+        />
+      </template>
+      <template v-else-if="activeMenuItem === 'leave'">
         <ManagerLeaveManagement />
       </template>
       <template v-else-if="activeMenuItem === 'staff'">
         <ManagerStaffManagement />
       </template>
       <template v-if="activeMenuItem === 'loans'">
-        <ManagerWorkView />
+        <ManagerWorkView :active-tab="activeTab" />
       </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import {ref, provide} from 'vue'
-import {User, Document, Calendar, ArrowLeft, ArrowRight} from '@element-plus/icons-vue'
+import { ref, provide } from 'vue'
+import { User, Document, Calendar, ArrowLeft, ArrowRight, DataBoard } from '@element-plus/icons-vue'
 import ManagerLeaveManagement from '@/components/leave/ManagerLeaveManagement.vue'
 import ManagerStaffManagement from '@/components/staff/ManagerStaffManagement.vue'
-import {ElMessage} from 'element-plus'
+import ManagerWorkView from "@/views/loan/ManagerWorkView.vue"
+import StatsOverview from '@/components/dashboard/StatsOverview.vue'
+import { ElMessage } from 'element-plus'
 import axios from 'axios'
-import ManagerWorkView from "@/views/loan/ManagerWorkView.vue";
 
 const allStaffList = ref([])
 const staffDataLoaded = ref(false)
 const loadingStaffData = ref(false)
+const activeTab = ref('review') // 添加 activeTab ref
 
 // 修改為與主管相同的 API 端點
 const fetchAllDepartmentStaff = async () => {
@@ -69,7 +78,6 @@ const fetchAllDepartmentStaff = async () => {
 
   loadingStaffData.value = true
   try {
-    // 使用相同的 API 端點
     const response = await axios.get('/api/user/all-department-employees')
     allStaffList.value = response.data
     staffDataLoaded.value = true
@@ -94,13 +102,24 @@ provide('staffManagement', {
 })
 
 const isSidebarCollapsed = ref(true)
-const activeMenuItem = ref('leave')
+const activeMenuItem = ref('overview') // 設置預設頁面為總覽
 
 const menuItems = [
-  {id: 'staff', label: '員工管理', icon: User},
-  {id: 'loans', label: '貸款審核', icon: Document},
-  {id: 'leave', label: '請假管理', icon: Calendar},
+  { id: 'overview', label: '總覽', icon: DataBoard },
+  { id: 'staff', label: '員工管理', icon: User },
+  { id: 'loans', label: '貸款審核', icon: Document },
+  { id: 'leave', label: '請假管理', icon: Calendar },
 ]
+
+// 處理選單項目更新
+const handleMenuItemUpdate = (menuItem) => {
+  activeMenuItem.value = menuItem
+}
+
+// 處理頁籤更新
+const handleTabUpdate = (tab) => {
+  activeTab.value = tab
+}
 
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value

@@ -1220,5 +1220,125 @@ router.get('/calculate-duration', verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * 獲取請假統計數據
+ * GET /api/leave/stats
+ */
+router.get('/stats', verifyToken, async (req, res) => {
+    try {
+        // 获取用户信息
+        const user = await User.findById(req.user.id)
+            .select('employeeId department position')
+            .lean();
 
+        if (!user) {
+            return res.status(404).json({ msg: '找不到用戶信息' });
+        }
+
+        // 修改：允許主管和經理查看
+        if (!['M', 'S'].includes(user.position)) {
+            return res.status(403).json({ msg: '權限不足' });
+        }
+
+        const currentDate = new Date();
+        const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+
+        // 构建基础查询条件
+        const baseQuery = {
+            department: user.department
+        };
+
+        // 如果是主管，只獲取科員的請假數據
+        if (user.position === 'S') {
+            baseQuery['employeePosition'] = 'C';
+        }
+
+        // 获取各类统计数据
+        const [pendingLeaves, monthlyLeaves] = await Promise.all([
+            // 待審核的請假申請數量
+            Leave.countDocuments({
+                ...baseQuery,
+                status: 'pending'
+            }),
+            // 本月的請假申請總數（所有狀態）
+            Leave.countDocuments({
+                ...baseQuery,
+                createdAt: {
+                    $gte: firstDayOfMonth,
+                    $lte: lastDayOfMonth
+                }
+            })
+        ]);
+
+        res.json({
+            pendingLeaves,
+            totalLeaves: monthlyLeaves
+        });
+
+    } catch (error) {
+        console.error('獲取請假統計失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+/**
+ * 獲取請假分布統計
+ * GET /api/leave/distribution
+ */
+router.get('/distribution', verifyToken, async (req, res) => {
+    try {
+        const { range = 'week' } = req.query;
+        const endDate = new Date();
+        const startDate = new Date();
+
+        // 根據範圍設置起始日期
+        if (range === 'week') {
+            startDate.setDate(endDate.getDate() - 7);
+        } else {
+            startDate.setMonth(endDate.getMonth() - 1);
+        }
+
+        // 查詢請假類型分布
+        const result = await Leave.aggregate([
+            {
+                $match: {
+                    department: req.user.department,  // 只查看本部門
+                    status: 'approved',              // 只統計已核准的請假
+                    startDate: {
+                        $gte: startDate,
+                        $lte: endDate
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: '$leaveType',
+                    value: { $sum: 1 }  // 計算每種類型的數量
+                }
+            }
+        ]);
+
+        // 轉換請假類型名稱為中文
+        const typeNameMap = {
+            'annual': '特休假',
+            'sick': '病假',
+            'personal': '事假',
+            'funeral': '喪假',
+            'marriage': '婚假',
+            'maternity': '產假'
+        };
+
+        // 格式化返回數據
+        const formattedResult = result.map(item => ({
+            type: typeNameMap[item._id] || item._id,
+            value: item.value
+        }));
+
+        res.json(formattedResult);
+
+    } catch (error) {
+        console.error('獲取請假分布統計失敗:', error);
+        res.status(500).json({ message: '伺服器錯誤' });
+    }
+});
 module.exports = router;

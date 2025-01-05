@@ -37,6 +37,12 @@
 
     <!-- 右側內容區 -->
     <div class="content-area">
+      <template v-if="activeMenuItem === 'overview'">
+        <SupervisorStatsOverview
+            @update-menu-item="handleMenuItemUpdate"
+            @update-tab="handleTabUpdate"
+        />
+      </template>
       <template v-if="activeMenuItem === 'leave'">
         <SupervisorLeaveManagement />
       </template>
@@ -52,12 +58,13 @@
 
 <script setup>
 import { ref, provide } from 'vue'
-import { User, Document, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { User, Document, Calendar, ArrowLeft, ArrowRight,DataBoard } from '@element-plus/icons-vue'
 import SupervisorLeaveManagement from '@/components/leave/SupervisorLeaveManagement.vue'
 import SupervisorStaffManagement from '@/components/staff/SupervisorStaffManagement.vue'
 import SupervisorWork from '@/views/loan/SupervisorWorkView.vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
+import SupervisorStatsOverview from "@/components/dashboard/SupervisorStatsOverview.vue";
 
 const allStaffList = ref([])
 const staffDataLoaded = ref(false)
@@ -91,9 +98,10 @@ provide('staffManagement', {
 })
 
 const isSidebarCollapsed = ref(true)
-const activeMenuItem = ref('leave')
+const activeMenuItem = ref('overview')
 
 const menuItems = [
+  { id: 'overview', label: '總覽', icon: DataBoard },
   { id: 'staff', label: '員工管理', icon: User },
   { id: 'loans', label: '貸款審核', icon: Document },
   { id: 'leave', label: '請假管理', icon: Calendar },
@@ -101,6 +109,11 @@ const menuItems = [
 
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value
+}
+
+// 添加處理事件的函數
+const handleMenuItemUpdate = (page) => {
+  activeMenuItem.value = page;
 }
 </script>
 

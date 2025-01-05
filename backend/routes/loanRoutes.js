@@ -386,4 +386,118 @@ router.get('/stats', async (req, res) => {
     }
 })
 
+// 在 loanRoutes.js 添加
+router.get('/trend', verifyToken, async (req, res) => {
+    try {
+        const { range = 'week' } = req.query;
+        const endDate = new Date();
+        const startDate = new Date();
+
+        if (range === 'week') {
+            startDate.setDate(endDate.getDate() - 7);
+        } else {
+            startDate.setMonth(endDate.getMonth() - 1);
+        }
+
+        const pipeline = [
+            {
+                $match: {
+                    createdAt: { $gte: startDate, $lte: endDate }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                        status: "$status"
+                    },
+                    count: { $sum: 1 }
+                }
+            }
+        ];
+
+        const result = await LoanApplication.aggregate(pipeline);
+
+        // 組織數據以供前端使用
+        const chartData = [];
+        let currentDate = new Date(startDate);
+
+        while (currentDate <= endDate) {
+            const dateString = currentDate.toISOString().split('T')[0];
+            const dayData = {
+                date: dateString,
+                pending: 0,
+                approved: 0,
+                rejected: 0
+            };
+
+            result.forEach(item => {
+                if (item._id.date === dateString) {
+                    dayData[item._id.status] = item.count;
+                }
+            });
+
+            chartData.push(dayData);
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        res.json(chartData);
+    } catch (error) {
+        console.error('獲取貸款趨勢數據失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
+// 在 leave.js 添加
+router.get('/distribution', verifyToken, async (req, res) => {
+    try {
+        const { range = 'week' } = req.query;
+        const endDate = new Date();
+        const startDate = new Date();
+
+        if (range === 'week') {
+            startDate.setDate(endDate.getDate() - 7);
+        } else {
+            startDate.setMonth(endDate.getMonth() - 1);
+        }
+
+        const pipeline = [
+            {
+                $match: {
+                    createdAt: { $gte: startDate, $lte: endDate },
+                    status: 'approved'
+                }
+            },
+            {
+                $group: {
+                    _id: "$leaveType",
+                    count: { $sum: 1 }
+                }
+            }
+        ];
+
+        const result = await Leave.aggregate(pipeline);
+
+        // 轉換請假類型名稱為中文
+        const typeNameMap = {
+            'annual': '特休',
+            'sick': '病假',
+            'personal': '事假',
+            'funeral': '喪假',
+            'marriage': '婚假',
+            'maternity': '產假'
+        };
+
+        const chartData = result.map(item => ({
+            type: typeNameMap[item._id] || item._id,
+            value: item.count
+        }));
+
+        res.json(chartData);
+    } catch (error) {
+        console.error('獲取請假分布數據失敗:', error);
+        res.status(500).json({ msg: '伺服器錯誤' });
+    }
+});
+
 module.exports = router;

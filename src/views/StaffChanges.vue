@@ -149,22 +149,6 @@
           </div>
         </el-tab-pane>
 
-        <!-- 調職管理頁籤 (預留功能) -->
-        <el-tab-pane label="調職管理" name="transfer" :disabled="true">
-          <div class="coming-soon">
-            <el-empty description="功能開發中">
-              <template #image>
-                <el-icon :size="60" color="#909399"><Tools /></el-icon>
-              </template>
-              <template #description>
-                <span class="coming-soon-text">
-                  調職管理功能開發中，敬請期待
-                </span>
-              </template>
-            </el-empty>
-          </div>
-        </el-tab-pane>
-
         <el-tab-pane label="歷史紀錄" name="history">
           <AccountHistory />
         </el-tab-pane>
@@ -355,7 +339,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import {
-  Refresh, Key, View, UserFilled, Tools,
+  Refresh, Key, View, UserFilled,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import axios from 'axios'
