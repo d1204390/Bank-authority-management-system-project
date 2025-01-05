@@ -416,23 +416,15 @@ router.get('/pending-approvals', verifyToken, supervisorAuth, async (req, res) =
             return res.status(404).json({ msg: '找不到用戶信息' });
         }
 
-        // 構建查詢條件：
-        // 1. 只查看自己部門的請假申請
-        // 2. 只查看待審核的申請
-        // 3. 只查看科員(C)的請假申請
-        // 4. 排除自己的請假申請
-        const query = {
-            department: user.department,
-            status: 'pending',
-            employeeId: { $ne: user.employeeId } // 排除自己的請假申請
-        };
-
-        // 計算總數
-        const total = await Leave.countDocuments(query);
-
         // 獲取待審核申請
         const leaves = await Leave.aggregate([
-            { $match: query },
+            {
+                $match: {
+                    department: user.department,
+                    status: 'pending',
+                    employeeId: { $ne: user.employeeId }
+                }
+            },
             {
                 $lookup: {
                     from: 'users',
@@ -445,25 +437,34 @@ router.get('/pending-approvals', verifyToken, supervisorAuth, async (req, res) =
             // 只獲取科員(C)的請假申請
             { $match: { 'employee.position': 'C' } },
             {
-                $project: {
-                    _id: 1,
-                    employeeId: 1,
-                    employeeName: '$employee.name',
-                    startDate: 1,
-                    endDate: 1,
-                    leaveType: 1,
-                    reason: 1,
-                    duration: 1,
-                    createdAt: 1
+                $facet: {
+                    // 計算總數
+                    totalCount: [{ $count: 'count' }],
+                    // 獲取分頁數據
+                    paginatedResults: [
+                        { $sort: { createdAt: -1 } },
+                        { $skip: (parseInt(page) - 1) * parseInt(limit) },
+                        { $limit: parseInt(limit) },
+                        {
+                            $project: {
+                                _id: 1,
+                                employeeId: 1,
+                                employeeName: '$employee.name',
+                                startDate: 1,
+                                endDate: 1,
+                                leaveType: 1,
+                                reason: 1,
+                                duration: 1,
+                                createdAt: 1
+                            }
+                        }
+                    ]
                 }
-            },
-            { $sort: { createdAt: -1 } },
-            { $skip: (parseInt(page) - 1) * parseInt(limit) },
-            { $limit: parseInt(limit) }
+            }
         ]);
 
-        // 格式化數據
-        const formattedLeaves = leaves.map(leave => ({
+        const total = leaves[0].totalCount[0]?.count || 0;
+        const formattedLeaves = leaves[0].paginatedResults.map(leave => ({
             ...leave,
             startDate: formatDateTime(leave.startDate),
             endDate: formatDateTime(leave.endDate),
@@ -486,7 +487,6 @@ router.get('/pending-approvals', verifyToken, supervisorAuth, async (req, res) =
         res.status(500).json({ msg: '伺服器錯誤' });
     }
 });
-
 /**
  * 獲取部門請假歷史記錄
  * GET /api/leave/department-history
@@ -771,6 +771,20 @@ router.post('/manager/leave/approve/:leaveId', verifyToken, managerAuth, async (
             return res.status(403).json({ msg: '不能審核自己的請假申請' });
         }
 
+        // 獲取申請人資訊
+        const employee = await User.findOne({ employeeId: leave.employeeId })
+            .select('position')
+            .lean();
+
+        if (!employee) {
+            return res.status(404).json({ msg: '找不到申請人資訊' });
+        }
+
+        // 修改權限檢查：經理可以審核科員(C)、主管(S)和其他經理(M)的請假
+        if (!['C', 'S', 'M'].includes(employee.position)) {
+            return res.status(403).json({ msg: '無效的請假申請職位' });
+        }
+
         // 確保請假申請是待審核狀態
         if (leave.status !== 'pending') {
             return res.status(400).json({ msg: '此請假申請已被處理' });
@@ -809,7 +823,6 @@ router.post('/manager/leave/approve/:leaveId', verifyToken, managerAuth, async (
         res.status(500).json({ msg: '伺服器錯誤' });
     }
 });
-
 /**
  * 經理獲取部門請假歷史記錄
  * GET /api/leave/manager/department-history
