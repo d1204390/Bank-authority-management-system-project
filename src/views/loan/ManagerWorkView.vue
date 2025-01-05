@@ -1,9 +1,6 @@
 <template>
   <div class="work-view-container">
     <el-tabs v-model="activeTab" class="work-tabs" @tab-click="handleTabChange">
-      <el-tab-pane label="工作指派" name="assignment">
-        <ManagerAssignment />
-      </el-tab-pane>
       <el-tab-pane label="審核申請" name="review">
         <ManagerReview @review-completed="handleReviewCompleted" />
       </el-tab-pane>
@@ -17,10 +14,9 @@
 <script setup>
 import { ref } from 'vue'
 import ManagerReview from '@/components/loan/ManagerReview.vue'
-import ManagerAssignment from '@/components/loan/ManagerAssignment.vue'
 import ReviewHistory from '@/components/loan/ReviewHistory.vue'
 
-const activeTab = ref('assignment')
+const activeTab = ref('review')
 const historyRef = ref(null)
 
 // 處理審核完成事件

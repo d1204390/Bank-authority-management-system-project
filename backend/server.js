@@ -29,7 +29,7 @@ app.use('/api/admin', adminRoutes);
 const userRoutes = require('./routes/user');
 app.use('/api/user', userRoutes);
 
-// Leave routes (新增)
+// Leave routes
 const leaveRoutes = require('./routes/leave');
 app.use('/api/leave', leaveRoutes);
 
@@ -40,6 +40,7 @@ app.use('/api/loan', loanRoutes);
 // 新增新進員工路由
 const newEmployeeRoutes = require('./routes/newEmployeeRoutes');
 app.use('/api/new-employees', newEmployeeRoutes);
+
 //建立批量帳號
 const accountRoutes = require('./routes/accountRoutes');
 app.use('/api/accounts', accountRoutes);
