@@ -629,26 +629,29 @@ router.get('/department-history', verifyToken, supervisorAuth, async (req, res) 
  */
 router.get('/manager/leave/pending-approvals', verifyToken, managerAuth, async (req, res) => {
     try {
-        const { page = 1, limit = 10, position } = req.query;
+        // 先將 page 和 limit 轉換為數字
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const { position } = req.query;
 
-        const user = await User.findById(req.user.id)
+        const manager = await User.findById(req.user.id)
             .select('employeeId department')
             .lean();
 
-        if (!user) {
+        if (!manager) {
             return res.status(404).json({ msg: '找不到用戶信息' });
         }
 
-        // 構建查詢條件
-        const query = {
-            department: user.department,
+        // 基本查詢條件
+        const baseQuery = {
+            department: manager.department,
             status: 'pending',
-            employeeId: { $ne: user.employeeId } // 排除自己的請假申請
+            employeeId: { $ne: manager.employeeId }
         };
 
-        // 獲取待審核申請
-        const leaves = await Leave.aggregate([
-            { $match: query },
+        // 執行聚合查詢
+        const aggregatePipeline = [
+            { $match: baseQuery },
             {
                 $lookup: {
                     from: 'users',
@@ -662,52 +665,43 @@ router.get('/manager/leave/pending-approvals', verifyToken, managerAuth, async (
             {
                 $match: position ?
                     { 'employee.position': position } :
-                    { 'employee.position': { $in: ['C', 'S'] } }
+                    { 'employee.position': { $in: ['C', 'S', 'M'] } }
             },
+            { $sort: { createdAt: -1 } }
+        ];
+
+        // 計算總數
+        const countPipeline = [...aggregatePipeline];
+        const [countResult] = await Leave.aggregate(countPipeline.concat([
+            { $count: 'total' }
+        ]));
+        const total = countResult?.total || 0;
+
+        // 添加分頁
+        const paginatedResults = await Leave.aggregate([
+            ...aggregatePipeline,
+            { $skip: (page - 1) * limit },
+            { $limit: limit },
             {
                 $project: {
                     _id: 1,
                     employeeId: 1,
                     employeeName: '$employee.name',
                     position: '$employee.position',
+                    department: 1,
+                    leaveType: 1,
                     startDate: 1,
                     endDate: 1,
-                    leaveType: 1,
-                    reason: 1,
                     duration: 1,
+                    reason: 1,
+                    status: 1,
                     createdAt: 1
                 }
-            },
-            { $sort: { createdAt: -1 } },
-            { $skip: (parseInt(page) - 1) * parseInt(limit) },
-            { $limit: parseInt(limit) }
+            }
         ]);
 
-        // 計算總數（需要考慮職位過濾）
-        const countPipeline = [
-            { $match: query },
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'employeeId',
-                    foreignField: 'employeeId',
-                    as: 'employee'
-                }
-            },
-            { $unwind: '$employee' },
-            {
-                $match: position ?
-                    { 'employee.position': position } :
-                    { 'employee.position': { $in: ['C', 'S'] } }
-            },
-            { $count: 'total' }
-        ];
-
-        const totalResult = await Leave.aggregate(countPipeline);
-        const total = totalResult[0]?.total || 0;
-
-        // 格式化數據
-        const formattedLeaves = leaves.map(leave => ({
+        // 格式化響應數據
+        const formattedLeaves = paginatedResults.map(leave => ({
             ...leave,
             startDate: formatDateTime(leave.startDate),
             endDate: formatDateTime(leave.endDate),
@@ -719,9 +713,9 @@ router.get('/manager/leave/pending-approvals', verifyToken, managerAuth, async (
             leaves: formattedLeaves,
             pagination: {
                 total,
-                page: parseInt(page),
-                limit: parseInt(limit),
-                totalPages: Math.ceil(total / parseInt(limit))
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit)
             }
         });
 
@@ -737,18 +731,18 @@ router.post('/manager/leave/approve/:leaveId', verifyToken, managerAuth, async (
         const { leaveId } = req.params;
         const { status, comment } = req.body;
 
-        // 驗證必要欄位
+        // 驗證請求數據
         if (!status || !['approved', 'rejected'].includes(status)) {
             return res.status(400).json({ msg: '請提供有效的審核狀態 (approved/rejected)' });
         }
 
-        if (!comment) {
-            return res.status(400).json({ msg: '備註是必填的' });
+        if (!comment || comment.trim().length < 1) {
+            return res.status(400).json({ msg: '請提供審核意見' });
         }
 
         // 獲取經理資訊
         const manager = await User.findById(req.user.id)
-            .select('employeeId department position')
+            .select('employeeId department position name')
             .lean();
 
         if (!manager) {
@@ -761,39 +755,43 @@ router.post('/manager/leave/approve/:leaveId', verifyToken, managerAuth, async (
             return res.status(404).json({ msg: '找不到請假申請' });
         }
 
-        // 確保經理只能審核自己部門的請假
+        // 權限檢查
         if (leave.department !== manager.department) {
             return res.status(403).json({ msg: '無權審核其他部門的請假申請' });
         }
 
-        // 確保經理不能審核自己的請假
         if (leave.employeeId === manager.employeeId) {
             return res.status(403).json({ msg: '不能審核自己的請假申請' });
         }
 
+        if (leave.status !== 'pending') {
+            return res.status(400).json({ msg: '此請假申請已被處理' });
+        }
+
         // 獲取申請人資訊
         const employee = await User.findOne({ employeeId: leave.employeeId })
-            .select('position')
+            .select('position name')
             .lean();
 
         if (!employee) {
             return res.status(404).json({ msg: '找不到申請人資訊' });
         }
 
-        // 修改權限檢查：經理可以審核科員(C)、主管(S)和其他經理(M)的請假
-        if (!['C', 'S', 'M'].includes(employee.position)) {
+        // 特殊權限檢查
+        if (employee.position === 'M') {
+            // 經理之間互審
+            if (manager.position !== 'M') {
+                return res.status(403).json({ msg: '只有經理可以審核經理的請假申請' });
+            }
+        } else if (!['C', 'S'].includes(employee.position)) {
             return res.status(403).json({ msg: '無效的請假申請職位' });
         }
 
-        // 確保請假申請是待審核狀態
-        if (leave.status !== 'pending') {
-            return res.status(400).json({ msg: '此請假申請已被處理' });
-        }
-
-        // 更新請假狀態和審核鏈
+        // 更新請假狀態
         leave.status = status;
         leave.approvalChain.push({
             approverEmployeeId: manager.employeeId,
+            approverName: manager.name,
             status,
             comment,
             timestamp: new Date()
@@ -807,6 +805,7 @@ router.post('/manager/leave/approve/:leaveId', verifyToken, managerAuth, async (
             startDate: formatDateTime(leave.startDate),
             endDate: formatDateTime(leave.endDate),
             formattedDuration: formatDuration(leave.duration),
+            employeeName: employee.name,
             approvalChain: leave.approvalChain.map(approval => ({
                 ...approval.toObject(),
                 timestamp: formatDateTime(approval.timestamp)
@@ -832,9 +831,9 @@ router.get('/manager/department-history', verifyToken, managerAuth, async (req, 
         const {
             page = 1,
             limit = 10,
-            employeeName,  // 姓名篩選
-            leaveType,     // 假別篩選
-            status        // 狀態篩選
+            employeeName,
+            leaveType,
+            status
         } = req.query;
 
         const user = await User.findById(req.user.id)
@@ -845,7 +844,7 @@ router.get('/manager/department-history', verifyToken, managerAuth, async (req, 
             return res.status(404).json({ msg: '找不到用戶信息' });
         }
 
-        // 構建 MongoDB 查詢條件
+        // 構建 MongoDB 查詢條件 - 經理可以看所有人
         const baseQuery = {
             department: user.department
         };
@@ -864,10 +863,7 @@ router.get('/manager/department-history', verifyToken, managerAuth, async (req, 
                     as: 'employee'
                 }
             },
-            { $unwind: '$employee' },
-
-            // 第三步：經理可以看到科員和主管的請假記錄
-            { $match: { 'employee.position': { $in: ['C', 'S'] } } }
+            { $unwind: '$employee' }
         ];
 
         // 姓名篩選
@@ -917,7 +913,7 @@ router.get('/manager/department-history', verifyToken, managerAuth, async (req, 
                     _id: 1,
                     employeeId: 1,
                     employeeName: '$employee.name',
-                    position: '$employee.position', // 添加職位欄位
+                    position: '$employee.position',
                     startDate: 1,
                     endDate: 1,
                     leaveType: 1,
@@ -963,7 +959,6 @@ router.get('/manager/department-history', verifyToken, managerAuth, async (req, 
         res.status(500).json({ msg: '伺服器錯誤' });
     }
 });
-
 /**
  * 主管審核請假
  */
@@ -1239,13 +1234,13 @@ router.get('/calculate-duration', verifyToken, async (req, res) => {
  */
 router.get('/stats', verifyToken, async (req, res) => {
     try {
-        // 获取用户信息
+        // 獲取使用者資訊
         const user = await User.findById(req.user.id)
             .select('employeeId department position')
             .lean();
 
         if (!user) {
-            return res.status(404).json({ msg: '找不到用戶信息' });
+            return res.status(404).json({ msg: '找不到使用者資訊' });
         }
 
         // 修改：允許主管和經理查看
@@ -1257,24 +1252,25 @@ router.get('/stats', verifyToken, async (req, res) => {
         const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
-        // 构建基础查询条件
+        // 建立基本查詢條件 - 排除自己的資料
         const baseQuery = {
-            department: user.department
+            department: user.department,
+            employeeId: { $ne: user.employeeId }  // 排除自己的申請
         };
 
-        // 如果是主管，只獲取科員的請假數據
+        // 如果是主管，只獲取科員的請假資料
         if (user.position === 'S') {
             baseQuery['employeePosition'] = 'C';
         }
 
-        // 获取各类统计数据
+        // 獲取各類統計資料
         const [pendingLeaves, monthlyLeaves] = await Promise.all([
             // 待審核的請假申請數量
             Leave.countDocuments({
                 ...baseQuery,
                 status: 'pending'
             }),
-            // 本月的請假申請總數（所有狀態）
+            // 本月的請假申請總數（包含所有狀態）
             Leave.countDocuments({
                 ...baseQuery,
                 createdAt: {
@@ -1294,6 +1290,8 @@ router.get('/stats', verifyToken, async (req, res) => {
         res.status(500).json({ msg: '伺服器錯誤' });
     }
 });
+
+
 /**
  * 獲取請假分布統計
  * GET /api/leave/distribution

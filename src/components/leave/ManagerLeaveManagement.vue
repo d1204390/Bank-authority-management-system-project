@@ -28,6 +28,7 @@
             <el-select v-model="filterPosition" placeholder="職位" clearable>
               <el-option label="科員" value="C" />
               <el-option label="主管" value="S" />
+              <el-option label="經理" value="M" />
             </el-select>
           </div>
 
