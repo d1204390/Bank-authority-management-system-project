@@ -1,6 +1,7 @@
+
 <template>
   <div class="work-view-container">
-    <el-tabs v-model="activeTab" class="work-tabs" @tab-click="handleTabChange">
+    <el-tabs v-model="currentTab" class="work-tabs" @tab-click="handleTabChange">
       <el-tab-pane label="審核申請" name="review">
         <ManagerReview @review-completed="handleReviewCompleted" />
       </el-tab-pane>
@@ -12,11 +13,9 @@
 </template>
 
 <script setup>
-import { ref ,watch,defineProps} from 'vue'
+import { ref, watch,defineProps } from 'vue'
 import ManagerReview from '@/components/loan/ManagerReview.vue'
 import ReviewHistory from '@/components/loan/ReviewHistory.vue'
-
-const activeTab = ref('review')
 
 // 添加 props
 const props = defineProps({
@@ -37,14 +36,13 @@ const historyRef = ref(null)
 
 // 處理審核完成事件
 const handleReviewCompleted = () => {
-  if (activeTab.value === 'history' && historyRef.value) {
+  if (currentTab.value === 'history' && historyRef.value) {
     historyRef.value.fetchReviews()
   }
 }
 
 // 處理標籤切換
 const handleTabChange = (tab) => {
-  // 添加一個檢查以確保方法存在
   if (tab.props.name === 'history' && historyRef.value?.fetchReviews) {
     historyRef.value.fetchReviews()
   }
