@@ -142,37 +142,6 @@
           </div>
         </el-card>
       </el-col>
-
-      <!-- 請假類型分布圖 -->
-      <el-col :xs="24" :sm="12">
-        <el-card class="chart-card" shadow="hover">
-          <template #header>
-            <div class="chart-header">
-              <span>請假類型分布</span>
-              <el-button-group>
-                <el-button
-                    v-for="btn in leaveTimeButtons"
-                    :key="btn.value"
-                    :type="btn.active ? 'primary' : ''"
-                    size="small"
-                    @click="updateLeaveChart(btn.value)"
-                >
-                  {{ btn.label }}
-                </el-button>
-              </el-button-group>
-            </div>
-          </template>
-          <div class="chart-content" v-loading="leaveChartLoading">
-            <v-chart
-                v-if="leaveChartData.length > 0"
-                class="chart"
-                :option="leaveChartOption"
-                autoresize
-            />
-            <el-empty v-else description="暫無數據" />
-          </div>
-        </el-card>
-      </el-col>
     </el-row>
   </div>
 </template>
@@ -228,13 +197,10 @@ const leaveStats = ref({
   pending: 0,
   total: 0
 })
-
-const leaveTimeButtons = ref([
+ref([
   { label: '本週', value: 'week', active: true },
   { label: '本月', value: 'month', active: false }
-])
-
-
+]);
 // 添加圖表配置
 const loanChartOption = computed(() => ({
   tooltip: {
@@ -278,8 +244,7 @@ const loanChartOption = computed(() => ({
     }
   ]
 }))
-
-const leaveChartOption = computed(() => ({
+computed(() => ({
   tooltip: {
     trigger: 'item',
     formatter: '{b}: {c} ({d}%)'
@@ -305,8 +270,7 @@ const leaveChartOption = computed(() => ({
       }
     }
   ]
-}))
-
+}));
 // 頁面導航函數
 const navigateToPage = (page, tab = null) => {
   emit('updateMenuItem', page)
@@ -319,15 +283,6 @@ const handleLoanTimeRangeChange = async (range) => {
   loanTimeRange.value = range
   await fetchLoanTrendData()
 }
-
-const updateLeaveChart = async (range) => {
-  leaveTimeButtons.value.forEach(btn => {
-    btn.active = btn.value === range
-  })
-  leaveTimeRange.value = range
-  await fetchLeaveDistributionData()
-}
-
 const fetchLoanStats = async () => {
   try {
     const response = await axios.get('/api/loan/stats')
