@@ -10,7 +10,7 @@
         <el-card
             class="stat-card"
             shadow="hover"
-            @click="navigateToPage('staff')"
+            @click="navigateToPage('staff' ,'review')"
         >
           <div class="stat-header">
             <el-icon><User /></el-icon>
@@ -38,9 +38,9 @@
             <span class="stat-title">待審核貸款</span>
           </div>
           <div class="stat-content">
-            <div class="stat-value">{{ loanStats.pending }}</div>
+            <div class="stat-value">{{ loanStats.managerPending }}</div>
             <div class="stat-footer">
-              <el-tag v-if="loanStats.pending > 0" size="small" type="danger">需要處理</el-tag>
+              <el-tag v-if="loanStats.managerPending > 0" size="small" type="danger">需要處理</el-tag>
               <el-tag v-else size="small" type="success">無待處理項目</el-tag>
             </div>
           </div>
@@ -52,7 +52,7 @@
         <el-card
             class="stat-card"
             shadow="hover"
-            @click="navigateToPage('leave')"
+            @click="navigateToPage('leave','review')"
         >
           <div class="stat-header">
             <el-icon><Calendar /></el-icon>
@@ -93,7 +93,7 @@
         <el-card
             class="stat-card"
             shadow="hover"
-            @click="navigateToPage('leave')"
+            @click="navigateToPage('leave','history')"
         >
           <div class="stat-header">
             <el-icon><DataAnalysis /></el-icon>
@@ -189,8 +189,8 @@ const fetchNewEmployeeStats = async () => {
 
 
 const loanStats = ref({
-  pending: 0,
-  approved: 0
+  managerPending: 0,  // 經理待審核
+  approved: 0        // 已核准
 })
 
 const leaveStats = ref({
@@ -287,7 +287,7 @@ const fetchLoanStats = async () => {
   try {
     const response = await axios.get('/api/loan/stats')
     loanStats.value = {
-      pending: response.data.pendingLoans || 0,
+      managerPending: response.data.managerPendingLoans || 0,
       approved: response.data.completedLoans || 0
     }
   } catch (error) {

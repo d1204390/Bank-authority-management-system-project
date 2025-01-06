@@ -12,11 +12,27 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref ,watch,defineProps} from 'vue'
 import ManagerReview from '@/components/loan/ManagerReview.vue'
 import ReviewHistory from '@/components/loan/ReviewHistory.vue'
 
 const activeTab = ref('review')
+
+// 添加 props
+const props = defineProps({
+  activeTab: {
+    type: String,
+    default: 'review'
+  }
+})
+
+const currentTab = ref(props.activeTab)
+
+// 監聽 activeTab 的變化
+watch(() => props.activeTab, (newTab) => {
+  currentTab.value = newTab
+}, { immediate: true })
+
 const historyRef = ref(null)
 
 // 處理審核完成事件

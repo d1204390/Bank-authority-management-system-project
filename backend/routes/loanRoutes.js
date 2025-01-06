@@ -373,7 +373,6 @@ router.get('/review-history', verifyToken, async (req, res) => {
 
 router.get('/stats', verifyToken, async (req, res) => {
     try {
-        // 先查詢用戶資訊
         const user = await User.findById(req.user.id)
             .select('employeeId department position')
             .lean();
@@ -382,28 +381,54 @@ router.get('/stats', verifyToken, async (req, res) => {
             return res.status(404).json({ msg: '找不到用戶資訊' });
         }
 
-        // 驗證部門
         if (user.department !== 'LD') {
             return res.status(403).json({ msg: '只有借貸部門可以查看統計' });
         }
 
-        // 建立基本查詢條件
         let query = {};
-
-        // 如果是一般職員，只能看到自己的申請
         if (user.position === 'C') {
             query.employeeId = user.employeeId;
         }
 
-        // 計算各狀態的數量
+        // 主管待審核案件：status 為 pending 且尚未有任何審核記錄
+        const supervisorPendingLoans = await LoanApplication.countDocuments({
+            'status': 'pending',
+            'approvalChain': { $size: 0 }
+        });
+
+        // 經理待審核案件：金額 >= 500萬，有主管審核通過記錄，但還沒有經理審核記錄
+        const managerPendingLoans = await LoanApplication.countDocuments({
+            'loanInfo.amount': { $gte: 5000000 },
+            $and: [
+                {
+                    'approvalChain': {
+                        $elemMatch: {
+                            approverPosition: 'S',
+                            status: 'approved'
+                        }
+                    }
+                },
+                {
+                    'approvalChain': {
+                        $not: {
+                            $elemMatch: {
+                                approverPosition: 'M'
+                            }
+                        }
+                    }
+                }
+            ]
+        });
+
         const stats = {
             pendingLoans: await LoanApplication.countDocuments({ ...query, status: 'pending' }),
             processingLoans: await LoanApplication.countDocuments({ ...query, status: 'processing' }),
             completedLoans: await LoanApplication.countDocuments({ ...query, status: 'approved' }),
-            rejectedLoans: await LoanApplication.countDocuments({ ...query, status: 'rejected' })
+            rejectedLoans: await LoanApplication.countDocuments({ ...query, status: 'rejected' }),
+            supervisorPendingLoans,  // 加入主管待審核數量
+            managerPendingLoans      // 加入經理待審核數量
         }
 
-        // 增加總數統計
         stats.totalLoans = Object.values(stats).reduce((acc, curr) => acc + curr, 0);
 
         res.json(stats);
