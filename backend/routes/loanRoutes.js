@@ -371,20 +371,50 @@ router.get('/review-history', verifyToken, async (req, res) => {
     }
 });
 
-router.get('/stats', async (req, res) => {
+router.get('/stats', verifyToken, async (req, res) => {
     try {
+        // 先查詢用戶資訊
+        const user = await User.findById(req.user.id)
+            .select('employeeId department position')
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({ msg: '找不到用戶資訊' });
+        }
+
+        // 驗證部門
+        if (user.department !== 'LD') {
+            return res.status(403).json({ msg: '只有借貸部門可以查看統計' });
+        }
+
+        // 建立基本查詢條件
+        let query = {};
+
+        // 如果是一般職員，只能看到自己的申請
+        if (user.position === 'C') {
+            query.employeeId = user.employeeId;
+        }
+
         // 計算各狀態的數量
         const stats = {
-            pendingLoans: await LoanApplication.countDocuments({ status: 'pending' }),
-            processingLoans: await LoanApplication.countDocuments({ status: 'processing' }),
-            completedLoans: await LoanApplication.countDocuments({ status: 'approved' }),
-            rejectedLoans: await LoanApplication.countDocuments({ status: 'rejected' })
+            pendingLoans: await LoanApplication.countDocuments({ ...query, status: 'pending' }),
+            processingLoans: await LoanApplication.countDocuments({ ...query, status: 'processing' }),
+            completedLoans: await LoanApplication.countDocuments({ ...query, status: 'approved' }),
+            rejectedLoans: await LoanApplication.countDocuments({ ...query, status: 'rejected' })
         }
-        res.json(stats)
+
+        // 增加總數統計
+        stats.totalLoans = Object.values(stats).reduce((acc, curr) => acc + curr, 0);
+
+        res.json(stats);
     } catch (error) {
-        res.status(500).json({ message: '獲取統計數據失敗' })
+        console.error('獲取統計數據失敗:', error);
+        res.status(500).json({
+            msg: '獲取統計數據失敗',
+            error: error.message
+        });
     }
-})
+});
 
 // 在 loanRoutes.js 添加
 router.get('/trend', verifyToken, async (req, res) => {
