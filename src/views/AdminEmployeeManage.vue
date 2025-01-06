@@ -206,14 +206,6 @@
                       size="small"
                   />
                 </el-tooltip>
-                <el-tooltip content="編輯資料" placement="top" :show-after="500">
-                  <el-button
-                      type="primary"
-                      @click.stop="handleEdit(scope.row)"
-                      :icon="Edit"
-                      size="small"
-                  />
-                </el-tooltip>
                 <el-tooltip content="修改密碼" placement="top" :show-after="500">
                   <el-button
                       type="warning"
@@ -346,7 +338,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import {
-  Plus, Edit, View, Delete, Search, Refresh,
+  Plus, View, Delete, Search, Refresh,
   Lock, Unlock, CircleCheck, CircleClose,
   User,Key,
 } from '@element-plus/icons-vue'

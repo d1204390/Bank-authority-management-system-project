@@ -58,8 +58,8 @@
         >
           <el-icon><Edit /></el-icon>
           <div class="menu-item-content" v-show="!isCollapsed || isMobile">
-            <h3>人員異動</h3>
-            <p>管理人員異動與新增</p>
+            <h3>新進人員</h3>
+            <p>管理新進人員新增</p>
           </div>
         </div>
       </div>
