@@ -1,28 +1,28 @@
-<template>
-  <div class="work-view-container">
-    <el-tabs v-model="activeTab" class="work-tabs" @tab-click="handleTabChange">
-      <el-tab-pane label="審核申請" name="review">
-        <SupervisorReview @review-completed="handleReviewCompleted" />
-      </el-tab-pane>
-      <el-tab-pane label="審核紀錄" name="history">
-        <ReviewHistory ref="historyRef" position="S" />
-      </el-tab-pane>
-    </el-tabs>
-  </div>
-</template>
-
 <script setup>
-import { ref } from 'vue'
+import { ref, watch ,defineProps} from 'vue'
 import SupervisorReview from '@/components/loan/SupervisorReview.vue'
 import ReviewHistory from '@/components/loan/ReviewHistory.vue'
 
-const activeTab = ref('review')
+// 添加 props
+const props = defineProps({
+  activeTab: {
+    type: String,
+    default: 'review'
+  }
+})
+
+const currentTab = ref(props.activeTab)
+
+// 監聽 props.activeTab 的變化
+watch(() => props.activeTab, (newTab) => {
+  currentTab.value = newTab
+}, { immediate: true })
+
 const historyRef = ref(null)
 
 // 處理審核完成事件
 const handleReviewCompleted = () => {
-  // 如果當前是在審核紀錄頁面，立即更新數據
-  if (activeTab.value === 'history' && historyRef.value) {
+  if (currentTab.value === 'history' && historyRef.value) {
     historyRef.value.fetchReviews()
   }
 }
@@ -34,3 +34,16 @@ const handleTabChange = (tab) => {
   }
 }
 </script>
+
+<template>
+  <div class="work-view-container">
+    <el-tabs v-model="currentTab" class="work-tabs" @tab-click="handleTabChange">
+      <el-tab-pane label="審核申請" name="review">
+        <SupervisorReview @review-completed="handleReviewCompleted" />
+      </el-tab-pane>
+      <el-tab-pane label="審核紀錄" name="history">
+        <ReviewHistory ref="historyRef" position="S" />
+      </el-tab-pane>
+    </el-tabs>
+  </div>
+</template>

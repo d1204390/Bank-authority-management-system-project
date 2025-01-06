@@ -50,7 +50,7 @@
         <SupervisorStaffManagement />
       </template>
       <template v-if="activeMenuItem === 'loans'">
-        <SupervisorWork />
+        <SupervisorWork :active-tab="activeTab" />
       </template>
     </div>
   </div>
@@ -114,6 +114,14 @@ const toggleSidebar = () => {
 // 添加處理事件的函數
 const handleMenuItemUpdate = (page) => {
   activeMenuItem.value = page;
+}
+
+// SupervisorDashboard.vue script setup 部分
+const activeTab = ref('review')
+
+// 處理頁籤更新
+const handleTabUpdate = (tab) => {
+  activeTab.value = tab
 }
 </script>
 
