@@ -1,24 +1,84 @@
+# Trust Me Bank - 銀行內部人員與權限管理系統
 
+一個專為銀行內部人員設計的綜合管理系統，提供身份驗證、權限控制和業務流程管理功能。
 
-## Project setup
+## 功能特點
+
+### 🔐 權限管理
+- 三級權限控制：經理(M)、主管(S)、科員(C)
+- 基於JWT的身份驗證
+- 自動登出保護機制
+- 密碼加密存儲
+
+### 👥 人員管理
+- 新進人員資料建立
+- 現職人員資訊維護
+- 人事異動追蹤
+- 批量資料處理
+
+### 📅 請假系統
+- 整合行事曆視圖
+- 多層級審核流程
+- 即時請假狀態更新
+- 假期餘額管理
+
+### 💰 貸款管理
+- 貸款申請處理
+- 分級審核機制
+- 申請狀態追蹤
+- 數據統計分析
+
+## 技術架構
+
+### 前端
+- Vue.js
+- Element Plus UI框架
+- FullCalendar.js (行事曆元件)
+
+### 後端
+- Node.js
+- Express框架
+- JWT認證
+
+### 資料庫
+- MongoDB
+- Mongoose ODM
+
+## 安裝說明
+
+1. clone專案
+```bash
+git clone [專案網址]
 ```
+
+2. 安裝依賴
+```bash
+# 後端依賴
+cd backend
+npm install
+
+# 前端依賴
+cd frontend
 npm install
 ```
 
-### Compiles and hot-reloads for development
-```
+3. 環境配置
+- 創建 `.env` 檔案
+- 設置必要環境變數（資料庫連接、JWT密鑰等）
+
+4. 啟動服務
+```bash
+# 啟動後端服務
+npm run server
+
+# 啟動前端開發服務器
 npm run serve
 ```
 
-### Compiles and minifies for production
-```
-npm run build
-```
 
-### Lints and fixes files
-```
-npm run lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+## 未來規劃
+- 功能設計優化
+- 使用者介面改進
+- 權限系統細緻化
+- 安全性強化
+- 資料庫結構優化
